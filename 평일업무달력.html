@@ -104,6 +104,10 @@ input[type=checkbox]{accent-color:var(--fg)}
 .chip.done .t{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:var(--strong);color:var(--muted)}
 .chip.done .t::before,.drow.done .t::before{content:'✓';display:inline-block;margin-right:7px;text-decoration:none;color:var(--fg)}
 .chip.sel{outline:1px dashed var(--fg);outline-offset:4px}
+.late{flex-shrink:0;font-size:11px;letter-spacing:.04em;color:var(--over);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cell.past .chip.overdue{opacity:1}
+.stat .over b{color:var(--over)}
+.badge.late{border-color:var(--over);color:var(--over)}
 .more{font-size:12px;letter-spacing:.04em;color:var(--muted);text-align:left;padding:2px 0}
 .more:hover{color:var(--fg);text-decoration:underline;text-decoration-style:dashed;text-underline-offset:4px}
 .clip{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -461,6 +465,8 @@ function preview(list,n){
   return {shown,more:list.length-shown.length};
 }
 function ddayTxt(k){const n=Math.round((P(k)-P(TODAY))/864e5);return n===0?'D-day':n>0?'D-'+n:'D+'+(-n);}
+const isLate=i=>i.status!=='done'&&i.due<TODAY;
+const STAT_KO={todo:'할 일',doing:'진행 중',done:'완료'};
 const fmtD=k=>{const d=P(k);return (d.getMonth()+1)+'월 '+d.getDate()+'일 ('+DOW[d.getDay()]+')';};
 
 function cellHTML(d,inMonth,compact){
@@ -478,9 +484,11 @@ function cellHTML(d,inMonth,compact){
   info.notes.forEach(n=>{h+='<div class="note"'+(n.c?' style="color:'+esc(n.c)+'"':n.h?' style="color:var(--hol-fg)"':'')+'>'+esc(n.t)+'</div>';});
   const p=preview(list,compact?2:(+S.style.maxPreview||3));
   p.shown.forEach(i=>{
-    h+='<div class="chipw"><button class="chip'+(i.priority==='high'&&i.status!=='done'?' high':'')+(i.status==='done'?' done':i.status==='doing'?' doing':'')+(ui.sel===i.id?' sel':'')+'" data-act="item" data-id="'+i.id+'" title="'+esc(i.title)+'">';
+    const late=isLate(i);
+    h+='<div class="chipw"><button class="chip'+(i.priority==='high'&&i.status!=='done'?' high':'')+(i.status==='done'?' done':i.status==='doing'?' doing':'')+(late?' overdue':'')+(ui.sel===i.id?' sel':'')+'" data-act="item" data-id="'+i.id+'" title="'+esc(i.title)+'" aria-label="'+esc(i.title+(i.priority==='high'&&i.status!=='done'?', 중요':'')+', '+STAT_KO[i.status]+(late?', 기한 지남 '+ddayTxt(i.due):''))+'">';
     h+='<span class="tg" style="background:'+tagColor(i.tags[0])+'"></span>';
     h+='<span class="t">'+(i.priority==='high'&&i.status!=='done'?'! ':'')+esc(i.title)+'</span></button>';
+    if(late)h+='<span class="late" aria-hidden="true">'+ddayTxt(i.due)+'</span>';
     if(i.links&&i.links.length)h+='<button class="clip" data-act="openlink" data-id="'+i.id+'" aria-label="문서 열기" title="'+esc(i.links[0].name)+(i.links.length>1?' 외 '+(i.links.length-1)+'개':'')+'"><svg class="i"><use href="#i-clip"/></svg></button>';
     h+='</div>';
   });
@@ -498,7 +506,7 @@ function renderMain(){
   $('grid').innerHTML=h;
   if(_af){const c=$('grid').querySelector('[data-day="'+_af+'"]');if(c){c.tabIndex=0;c.focus({preventScroll:true});}}
   const pre=m.y+'-'+pad(m.m+1);const mon=S.items.filter(i=>i.due.startsWith(pre));
-  $('stat').innerHTML='<span><b>'+mon.length+'</b>항목</span><span><b>'+mon.filter(i=>i.priority==='high'&&i.status!=='done').length+'</b>중요</span><span><b>'+mon.filter(i=>i.status==='done').length+'</b>완료</span>';
+  $('stat').innerHTML='<span><b>'+mon.length+'</b>항목</span><span><b>'+mon.filter(i=>i.priority==='high'&&i.status!=='done').length+'</b>중요</span><span><b>'+mon.filter(i=>i.status==='done').length+'</b>완료</span>'+(()=>{const n=S.items.filter(isLate).length;return n?'<span class="over" title="기한이 지난 미완료 항목 (전체)"><b>'+n+'</b>지연</span>':'';})();
   const ex=S.items.filter(i=>i.ex).length+S.customs.filter(c=>c.ex).length;
   const f=ui.filter,fl=[];if(f.tag)fl.push('#'+f.tag);if(f.who)fl.push('@'+f.who);if(f.mode==='high')fl.push('중요만');if(f.mode==='open')fl.push('미완료만');if(ui.q)fl.push('"'+ui.q+'"');
   let b='';
@@ -556,7 +564,7 @@ function renderDetail(){
   h+='<div><div class="fl">상태</div>'+seg('status',it.status,[['todo','할 일'],['doing','진행 중'],['done','완료']])+'</div>';
   h+='<div><div class="fl">중요도 '+tip('높음으로 두면 달력 칸에 항상 표시돼요')+'</div>'+seg('priority',it.priority,[['low','낮음'],['normal','보통'],['high','높음','ph']])+'</div>';
   h+='<div class="row2"><div><div class="fl">시작일</div><input class="fi" type="date" id="d-start" data-f="start" min="'+RMIN+'" max="'+RMAX+'" value="'+esc(it.start)+'"></div>';
-  h+='<div><div class="fl">기한 <span class="dday" id="d-dday" style="color:'+(it.due<TODAY&&it.status!=='done'?'var(--hol-fg)':'var(--accent)')+'">'+ddayTxt(it.due)+'</span></div><input class="fi" type="date" id="d-due" data-f="due" min="'+RMIN+'" max="'+RMAX+'" value="'+esc(it.due)+'"></div></div>';
+  h+='<div><div class="fl">기한 <span class="dday" id="d-dday" style="color:'+(isLate(it)?'var(--over)':'var(--fg)')+'">'+ddayTxt(it.due)+'</span></div><input class="fi" type="date" id="d-due" data-f="due" min="'+RMIN+'" max="'+RMAX+'" value="'+esc(it.due)+'"></div></div>';
   h+='<div class="warnline" id="d-warn">'+(wk(it.due)?'주말 날짜는 월~금 달력에 보이지 않아요.':'')+'</div>';
   h+='<div><div class="fl">담당자</div><input class="fi" id="d-who" data-f="assignees" value="'+esc(it.assignees.map(a=>'@'+a).join(' '))+'" placeholder="@나 @김과장"></div>';
   h+='<div><div class="fl">분류 (해시태그)</div><input class="fi" id="d-tags" data-f="tags" value="'+esc(it.tags.map(a=>'#'+a).join(' '))+'" placeholder="#보고 #예산"></div>';
@@ -631,7 +639,7 @@ function renderModal(){
     const labs=[];if(info.hol)labs.push('<span class="badge hol">'+esc(info.hol)+'</span>');info.customs.forEach(c=>labs.push('<span class="badge" style="color:'+esc(c.color)+';font-weight:700">'+esc(c.name)+'</span>'));info.notes.forEach(n=>labs.push('<span class="badge">'+esc(n.t)+'</span>'));
     if(labs.length)h+='<div class="labs">'+labs.join('')+'</div>';
     if(!list.length)h+='<div class="empty">항목 없음</div>';
-    list.forEach(i=>{h+='<button class="drow'+(i.status==='done'?' done':'')+'" data-act="item" data-id="'+i.id+'"><span class="tg" style="background:'+tagColor(i.tags[0])+';width:9px;height:9px;border-radius:50%;flex-shrink:0"></span>'+(i.priority==='high'&&i.status!=='done'?'<span class="badge high">높음</span>':i.priority==='low'?'<span class="badge">낮음</span>':'')+'<span class="t">'+esc(i.title)+'</span>'+(i.links&&i.links.length?'<span class="meta"><svg class="i" style="width:12px;height:12px;vertical-align:-2px"><use href="#i-clip"/></svg> '+i.links.length+'</span>':'')+'<span class="meta">'+esc(i.tags.map(t=>'#'+t).join(' '))+'</span><span class="meta">'+esc(i.assignees.map(t=>'@'+t).join(' '))+'</span><span class="badge">'+({todo:'○ 할 일',doing:'◐ 진행 중',done:'✓ 완료'}[i.status])+'</span></button>';});
+    list.forEach(i=>{h+='<button class="drow'+(i.status==='done'?' done':'')+'" data-act="item" data-id="'+i.id+'"><span class="tg" style="background:'+tagColor(i.tags[0])+';width:9px;height:9px;border-radius:50%;flex-shrink:0"></span>'+(i.priority==='high'&&i.status!=='done'?'<span class="badge high">높음</span>':i.priority==='low'?'<span class="badge">낮음</span>':'')+'<span class="t">'+esc(i.title)+'</span>'+(isLate(i)?'<span class="badge late">지연 '+ddayTxt(i.due)+'</span>':'')+(i.links&&i.links.length?'<span class="meta"><svg class="i" style="width:12px;height:12px;vertical-align:-2px"><use href="#i-clip"/></svg> '+i.links.length+'</span>':'')+'<span class="meta">'+esc(i.tags.map(t=>'#'+t).join(' '))+'</span><span class="meta">'+esc(i.assignees.map(t=>'@'+t).join(' '))+'</span><span class="badge">'+({todo:'○ 할 일',doing:'◐ 진행 중',done:'✓ 완료'}[i.status])+'</span></button>';});
     h+='<div class="qa-box" style="margin-top:10px"><svg class="i" style="color:var(--muted)"><use href="#i-plus"/></svg><input id="day-add" placeholder="항목 추가" autocomplete="off">'+tip('제목 뒤에 #분류 @담당 !높음을 붙일 수 있어요\n문서 파일을 끌어다 놓거나 경로를 붙여넣어도 추가돼요',1)+'</div><div class="qa-hint" id="day-err"></div></div>';
     md.innerHTML=h;setTimeout(()=>{const x=$('day-add');x&&x.focus();},30);return;
   }
@@ -958,7 +966,7 @@ $('detail').addEventListener('input',e=>{
   else if(f==='assignees')it.assignees=(t.value.match(/[^\s,@#]+/g)||[]);
   else if(f==='tags')it.tags=(t.value.match(/[^\s,#@]+/g)||[]);
   else if(f==='start')it.start=t.value;
-  else if(f==='due'){if(!t.value)return;it.due=t.value;$('d-dday').textContent=ddayTxt(it.due);const w=P(it.due).getDay();$('d-warn').textContent=w===0||w===6?'주말 날짜는 월~금 달력에 보이지 않아요.':'';}
+  else if(f==='due'){if(!t.value)return;it.due=t.value;$('d-dday').textContent=ddayTxt(it.due);$('d-dday').style.color=isLate(it)?'var(--over)':'var(--fg)';const w=P(it.due).getDay();$('d-warn').textContent=w===0||w===6?'주말 날짜는 월~금 달력에 보이지 않아요.':'';}
   else if(f==='ckt'){const c=it.checklist[+t.dataset.i];if(c)c.t=t.value;}
   save();soon();
 });
