@@ -204,11 +204,11 @@ select.fi{background:var(--bg)}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:max(20px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) max(20px,env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px))}
 .modal{background:var(--bg);border:2px dashed var(--strong);border-radius:12px;width:min(780px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
 .modal.wide{width:min(1200px,100%)}
-.mh{display:flex;align-items:center;gap:12px;padding:20px 28px;border-bottom:2px dashed var(--strong)}
+.mh{display:flex;align-items:center;gap:12px;padding:20px 28px;border-bottom:2px dashed var(--strong);flex-shrink:0}
 .mh h2{font-size:24px;font-weight:500;margin:0;flex:1;min-width:0;line-height:1.2}
 .mh h2 .meta{display:block;margin-top:6px;font-size:12px;letter-spacing:.04em}
 .mb{overflow-y:auto;padding:26px 28px 34px}
-.tabs{display:flex;gap:30px;padding:0 28px;border-bottom:2px dashed var(--strong);overflow-x:auto}
+.tabs{display:flex;gap:30px;padding:0 28px;border-bottom:2px dashed var(--strong);overflow-x:auto;flex-shrink:0}
 .tabs button{padding:15px 0 13px;font-size:13px;letter-spacing:.06em;color:var(--muted);border-bottom:1px dashed transparent;white-space:nowrap}
 .tabs button:hover{color:var(--fg)}
 .tabs button.on{color:var(--fg);border-bottom-color:var(--fg)}
@@ -690,7 +690,7 @@ function hintFor(text){
 }
 
 /* ---------- modals ---------- */
-function openModal(kind,opt){if(!ui.modal)ui.opener=document.activeElement;$('app').inert=true;ui.modal=kind;Object.assign(ui,opt||{});renderModal();$('ov').hidden=false;}
+function openModal(kind,opt){if(!ui.modal)ui.opener=document.activeElement;$('app').inert=true;ui.modal=kind;Object.assign(ui,opt||{});renderModal();$('ov').hidden=false;const f=kind==='settings'?$('tab-'+ui.stab):kind==='full'?$('modal').querySelector('[data-act=closem]'):null;if(f)f.focus();}
 function closeModal(){ui.modal=null;ui.arm=null;$('ov').hidden=true;$('modal').innerHTML='';$('app').inert=false;const o=ui.opener;ui.opener=null;try{if(o&&document.contains(o))o.focus();else if(ui.selDay){const c=document.querySelector('.cell[data-day="'+ui.selDay+'"]');c&&c.focus();}}catch(e){}}
 function head(t){return '<div class="mh"><h2 id="mt">'+t+'</h2><button class="ib" data-act="closem" aria-label="닫기"><svg class="i"><use href="#i-x"/></svg></button></div>';}
 function renderModal(){
@@ -720,7 +720,7 @@ function renderModal(){
   }
   if(ui.modal==='settings'){
     const tabs=[['days','지정일'],['links','문서 연결'],['style','스타일'],['wp','배경화면'],['data','백업 · 데이터']];
-    let h=head('설정')+'<div class="tabs" role="tablist">'+tabs.map(([v,l])=>'<button role="tab" aria-selected="'+(ui.stab===v)+'" class="'+(ui.stab===v?'on':'')+'" data-act="stab" data-v="'+v+'">'+l+'</button>').join('')+'</div><div class="mb set" id="setb">';
+    let h=head('설정')+'<div class="tabs" role="tablist" aria-label="설정 항목">'+tabs.map(([v,l])=>'<button role="tab" id="tab-'+v+'" aria-controls="setb" aria-selected="'+(ui.stab===v)+'" tabindex="'+(ui.stab===v?0:-1)+'" class="'+(ui.stab===v?'on':'')+'" data-act="stab" data-v="'+v+'">'+l+'</button>').join('')+'</div><div class="mb set" id="setb" role="tabpanel" aria-labelledby="tab-'+ui.stab+'" tabindex="0">';
     const ob=$('setb'),keep=ob&&ui.lastStab===ui.stab?ob.scrollTop:0;ui.lastStab=ui.stab;
     h+=({days:tabDays,links:tabLinks,style:tabStyle,wp:tabWp,data:tabData}[ui.stab])();
     md.innerHTML=h+'</div>';if(keep){const nb=$('setb');if(nb)nb.scrollTop=keep;}return;
@@ -1053,6 +1053,12 @@ $('detail').addEventListener('keydown',e=>{
   if(e.target.id==='ck-new'&&e.key==='Enter'&&!e.isComposing){const v=e.target.value.trim();const it=S.items.find(i=>i.id===ui.sel);if(v&&it){it.checklist.push({t:v,d:false});save();renderDetail();const n=$('ck-new');n&&n.focus();}}
 });
 $('modal').addEventListener('keydown',e=>{
+  if(e.target.getAttribute('role')==='tab'){
+    const ts=[...$('modal').querySelectorAll('[role=tab]')],i=ts.indexOf(e.target);
+    const j={ArrowLeft:i-1,ArrowRight:i+1,Home:0,End:ts.length-1}[e.key];
+    if(j!=null){e.preventDefault();const n=ts[(j+ts.length)%ts.length];ui.stab=n.dataset.v;ui.arm=null;renderModal();const nt=$('tab-'+ui.stab);nt&&nt.focus();}
+    return;
+  }
   if(e.target.id==='day-add'&&e.key==='Enter'&&!e.isComposing){
     const r=addFromText(e.target.value,ui.selDay);
     if(r.err){$('day-err').textContent=r.err;return;}
