@@ -116,7 +116,10 @@ input[type=checkbox]{accent-color:var(--fg)}
 .clip{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .clip:hover{border-color:var(--fg);color:var(--fg)}
 .clip svg.i{width:13px;height:13px}
-.cell.drop,.db.drop,.mb.drop{outline:1px dashed var(--fg);outline-offset:-6px;background:var(--surface)}
+.cell.drop,.detail.drop,.modal.drop{outline:1px dashed var(--fg);outline-offset:-6px;background:var(--surface)}
+.modal{position:relative}
+/* 끌어다 놓기 중인 칸/패널 한가운데 안내 */
+.drop::after{content:"여기에 놓기";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--bg);color:var(--fg);border:1px dashed var(--fg);border-radius:999px;padding:6px 14px;font-size:12px;letter-spacing:.06em;white-space:nowrap;pointer-events:none;z-index:4}
 
 .next{margin-top:48px;padding:34px 0 36px;border-top:2px dashed var(--strong)}
 .nrow{display:grid;grid-template-columns:150px minmax(0,1fr) auto 72px;gap:18px;align-items:center;width:100%;text-align:left;padding:17px 0;border-bottom:1px dashed var(--line);font-size:15px}
@@ -312,6 +315,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--faint);border-
   <symbol id="i-clip" viewBox="0 0 24 24"><path d="M20 11.5l-8.3 8.3a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
   <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></symbol>
   <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-3-6z"/></symbol>
 </svg>
 
@@ -352,7 +356,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--faint);border-
     <div class="qa">
       <div class="qa-box"><svg class="i" style="color:var(--muted)"><use href="#i-plus"/></svg>
         <input id="qa" placeholder="항목 추가" aria-label="빠른 추가" autocomplete="off">
-        <button class="tok" data-act="ins" data-t="#" aria-label="분류 넣기" title="분류">#</button><button class="tok" data-act="ins" data-t="@" aria-label="담당자 넣기" title="담당자">@</button><button class="tok" data-act="ins" data-t="!높음" aria-label="중요 표시" title="중요">!</button><span id="qa-tip"></span><button class="ib" data-act="qa" aria-label="추가"><svg class="i"><use href="#i-send"/></svg></button>
+        <button class="tok" data-act="ins" data-t="#" aria-label="분류 넣기" title="분류">#</button><button class="tok" data-act="ins" data-t="@" aria-label="담당자 넣기" title="담당자">@</button><button class="tok" data-act="ins" data-t="!높음" aria-label="중요 표시" title="중요">!</button><button class="tok" data-act="insd" aria-label="날짜 넣기 (누를 때마다 다음 평일)" title="날짜"><svg class="i" style="width:14px;height:14px" aria-hidden="true"><use href="#i-cal"/></svg></button><span id="qa-tip"></span><button class="ib" data-act="qa" aria-label="추가"><svg class="i"><use href="#i-send"/></svg></button>
       </div>
       <div class="qa-hint" id="qa-hint"></div>
     </div>
@@ -682,8 +686,8 @@ function addFromText(text,base){
   const it={id:uid(),title:p.title,due:sh.k,start:'',status:'todo',priority:p.pr,assignees:p.who,tags:p.tags,memo:'',checklist:[]};
   S.items.push(it);save();return {it,moved:sh.moved};
 }
-function hintFor(text){
-  if(!text.trim())return '';
+function hintFor(text,focused){
+  if(!text.trim())return focused?'→ '+fmtD(defaultDay())+' · @나':'';
   const p=parseQuick(text,defaultDay());const sh=weekdayShift(p.date);
   const parts=['→ '+fmtD(sh.k)];if(p.tags.length)parts.push(p.tags.map(t=>'#'+t).join(' '));parts.push(p.who.map(t=>'@'+t).join(' '));if(p.pr!=='normal')parts.push(p.pr==='high'?'중요도 높음':'중요도 낮음');
   return parts.join(' · ')+(sh.moved?' ('+sh.moved+')':'');
@@ -987,6 +991,13 @@ document.addEventListener('click',e=>{
    case 'clearex':S.items=S.items.filter(i=>!i.ex);S.customs=S.customs.filter(c=>!c.ex);if(ui.sel&&!S.items.find(i=>i.id===ui.sel))ui.sel=null;save();renderAll();if(ui.modal)renderModal();toast('예시를 지웠어요');break;
    case 'qa':submitQA();break;
    case 'tagc':{const g=t.dataset.v;S.tagColors[g]=(tagIdx(g)+1)%5;save();renderAll();toast('#'+g+' 색 바꿈');break;}
+   case 'insd':{/* 날짜 토큰: 첫 클릭은 다음 평일(내일이 평일이면 '내일'), 다시 누르면 하루씩(평일만) 뒤로 */
+     const i=$('qa'),v=i.value,re=/(^|\s)(오늘|내일|모레|\d{1,2}\/\d{1,2})$/,mm=v.match(re);
+     const nextWd=k=>{let d=addD(P(k),1);while(d.getDay()===0||d.getDay()===6)d=addD(d,1);return K(d);};
+     const md=k=>{const d=P(k);return (d.getMonth()+1)+'/'+d.getDate();};
+     if(mm){const cur=parseQuick(mm[2],TODAY).date;i.value=v.slice(0,v.length-mm[2].length)+md(nextWd(cur));}
+     else{const n=nextWd(TODAY);i.value=v+(v&&!/\s$/.test(v)?' ':'')+(n===K(addD(P(TODAY),1))?'내일':md(n));}
+     i.focus();i.dispatchEvent(new Event('input'));break;}
    case 'ins':{const i=$('qa');const v=i.value;i.value=v+(v&&!/\s$/.test(v)?' ':'')+t.dataset.t;i.focus();i.dispatchEvent(new Event('input'));break;}
    case 'setf':if(it){it[t.dataset.f]=t.dataset.v;delete it.ex;save();renderDetail();renderMain();renderSide();}break;
    case 'openlink':{const x=S.items.find(i=>i.id===t.dataset.id);if(!x)break;if(x.links.length===1)openLink(x.links[0]);else{openItem(x.id);toast('문서가 '+x.links.length+'개라 항목을 열었어요');}break;}
@@ -1027,8 +1038,10 @@ function submitQA(){
   const idx=MONTHS.findIndex(m=>r.it.due.startsWith(m.y+'-'+pad(m.m+1)));if(idx>=0)ui.mi=idx;
   renderSide();renderMain();toast(fmtD(r.it.due)+'에 추가했어요'+(r.moved?' · '+r.moved:''));
 }
-$('qa-tip').innerHTML=tip('날짜: 11/20 · 20일 · 내일\n#분류  @담당자  !높음 / !낮음\n문서: 경로를 붙여넣기 (Ctrl+V)\n\n예) 11/20 주간보고 #보고 @나 !높음',1);
-$('qa').addEventListener('input',e=>{const h=$('qa-hint');h.classList.remove('err');h.textContent=hintFor(e.target.value);});
+$('qa-tip').innerHTML=tip('날짜: 11/20 · 20일 · 내일 (달력 버튼)\n#분류  @담당자  !높음 / !낮음\n문서: 경로를 붙여넣기 (Ctrl+V)\n\n예) 11/20 주간보고 #보고 @나 !높음',1);
+$('qa').addEventListener('input',e=>{const h=$('qa-hint');h.classList.remove('err');h.textContent=hintFor(e.target.value,true);});
+$('qa').addEventListener('focus',e=>{const h=$('qa-hint');if(!h.classList.contains('err'))h.textContent=hintFor(e.target.value,true);});
+$('qa').addEventListener('blur',e=>{const h=$('qa-hint');if(!e.target.value.trim()&&!h.classList.contains('err'))h.textContent='';});
 $('qa').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();submitQA();}});
 let qT;$('q').addEventListener('input',e=>{clearTimeout(qT);qT=setTimeout(()=>{ui.q=e.target.value.trim();renderMain();},150);});
 
@@ -1120,8 +1133,8 @@ const clearDrop=()=>document.querySelectorAll('.drop').forEach(x=>x.classList.re
 function dropZone(e){
   const el=e.target.closest?e.target:e.target.parentElement;if(!el)return null;
   const c=el.closest('.cell[data-day]');if(c)return {el:c,day:c.dataset.day};
-  const d=el.closest('#detail');if(d&&ui.sel)return {el:d.querySelector('.db')||d,item:ui.sel};
-  if(ui.modal==='day'){const m=el.closest('#modal');if(m)return {el:m.querySelector('.mb')||m,day:ui.selDay};}
+  const d=el.closest('#detail');if(d&&ui.sel)return {el:d,item:ui.sel};
+  if(ui.modal==='day'){const m=el.closest('#modal');if(m)return {el:m,day:ui.selDay};}
   return null;
 }
 document.addEventListener('dragover',e=>{
