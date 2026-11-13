@@ -18,8 +18,7 @@
   --muted:color-mix(in srgb,var(--fg) 66%,var(--bg));
   --hol-bg:#2c1304; --hol-fg:#f0661a; --today-bg:#2a1a0c;
   --high-bg:var(--fg); --high-fg:var(--bg);
-  --win:var(--bg); --chip:var(--surface); --chip-h:color-mix(in srgb,var(--surface) 78%,var(--fg)); --out:color-mix(in srgb,var(--surface) 30%,var(--bg));
-  --accent:var(--fg); --accent-soft:var(--surface); --warn:var(--ember); --ok:var(--fg);
+  --chip-h:color-mix(in srgb,var(--surface) 78%,var(--fg)); --out:color-mix(in srgb,var(--surface) 30%,var(--bg));
   --fs:14px;
   --font:"Pretendard","Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
   --mono:Consolas,"D2Coding",ui-monospace,monospace;
@@ -204,7 +203,7 @@ select.fi{background:var(--bg)}
 .btn.pri:hover{background:var(--chip-h);border-color:var(--chip-h)}
 .btn.danger.arm{background:var(--fg);color:var(--bg)}
 
-.ov{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:max(20px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) max(20px,env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px))}
+.ov{position:fixed;inset:0;background:color-mix(in srgb,var(--bg) 84%,transparent);display:flex;align-items:center;justify-content:center;z-index:50;padding:max(20px,env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) max(20px,env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px))}
 .modal{background:var(--bg);border:2px dashed var(--strong);border-radius:12px;width:min(780px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
 .modal.wide{width:min(1200px,100%)}
 .mh{display:flex;align-items:center;gap:12px;padding:20px 28px;border-bottom:2px dashed var(--strong);flex-shrink:0}
@@ -260,9 +259,6 @@ textarea.code{font-family:var(--mono);font-size:11px;min-height:140px}
 .lk-n{display:block;max-width:100%;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lk-n:hover{text-decoration:underline;text-decoration-style:dashed;text-underline-offset:4px}
 .lk-p{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.guide ol{margin:0 0 6px;padding-left:20px}
-.guide li{margin-bottom:14px}
-kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--faint);border-radius:4px;padding:0 6px}
 .trow{display:grid;grid-template-columns:130px minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px dashed var(--line);font-size:14px}
 .trow b{display:flex;gap:6px;flex-wrap:wrap;align-content:flex-start;font-weight:500}
 
@@ -452,7 +448,7 @@ const tagColor=t=>t?'var('+TAGC[tagIdx(t)%5]+')':'var(--c0)';
 function applyStyle(){
   const r=document.documentElement.style;
   STYLE_VARS.forEach(([k,v])=>{S.style[k]?r.setProperty(v,S.style[k]):r.removeProperty(v);});
-  r.setProperty('--fs',(+S.style.fontSize||13)+'px');
+  r.setProperty('--fs',(+S.style.fontSize||DEF_STYLE.fontSize)+'px');
 }
 function cssVar(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
 
@@ -574,7 +570,7 @@ function renderNext(){
   const lim=K(addD(P(TODAY),21));
   const up=S.items.filter(i=>i.status!=='done'&&i.due>=TODAY&&i.due<=lim&&visible(i)).sort((a,b)=>a.due.localeCompare(b.due)||PR[a.priority]-PR[b.priority]).slice(0,6);
   let h='<div class="eyebrow">NEXT UP<span>다가오는 마감 · 3주</span></div>';
-  if(!up.length)h+='<div class="empty">3주 안에 마감되는 항목이 없어요.</div>';
+  if(!up.length)h+='<div class="empty">마감 없음</div>';
   up.forEach(i=>{h+='<button class="nrow" data-act="item" data-id="'+i.id+'"><span class="nd">'+fmtD(i.due)+'</span><span class="nt">'+(i.priority==='high'?'<em>중요</em>':'')+esc(i.title)+'</span><span class="ng">'+esc(i.tags.map(t=>'#'+t).join(' '))+'</span><span class="ndd">'+ddayTxt(i.due)+'</span></button>';});
   el.innerHTML=h;
 }
@@ -586,11 +582,11 @@ function renderSide(){
   [['all','전체'],['high','중요만'],['open','미완료만']].forEach(([v,l])=>{h+='<button class="sbtn'+(f.mode===v?' on':'')+'" data-act="mode" data-v="'+v+'">'+l+'</button>';});
   h+='<div class="sec">분류</div>';
   const tk=Object.keys(tags).sort((a,b)=>a.localeCompare(b,'ko'));
-  if(!tk.length)h+='<div class="side-empty">#분류를 붙이면 여기에 모여요.</div>';
+  if(!tk.length)h+='<div class="side-empty">분류 없음 '+tip('항목에 #분류를 붙이면 여기에 모여요')+'</div>';
   tk.forEach(t=>{h+='<button class="sbtn'+(f.tag===t?' on':'')+'" data-act="ftag" data-v="'+esc(t)+'"><span class="dot" data-act="tagc" data-v="'+esc(t)+'" title="색 바꾸기" style="background:'+tagColor(t)+'"></span>'+esc(t)+'<span class="n">'+tags[t]+'</span></button>';});
   h+='<div class="sec">담당자</div>';
   const wk=Object.keys(who).sort((a,b)=>a.localeCompare(b,'ko'));
-  if(!wk.length)h+='<div class="side-empty">@담당자를 붙이면 여기에 모여요.</div>';
+  if(!wk.length)h+='<div class="side-empty">담당자 없음 '+tip('항목에 @담당자를 붙이면 여기에 모여요')+'</div>';
   wk.forEach(t=>{h+='<button class="sbtn'+(f.who===t?' on':'')+'" data-act="fwho" data-v="'+esc(t)+'">'+esc(t)+'<span class="n">'+who[t]+'</span></button>';});
   if(f.tag||f.who||f.mode!=='all')h+='<div class="form" style="margin-top:30px"><button class="btn" data-act="clearf">필터 해제</button></div>';
   $('side').innerHTML=h;
@@ -608,12 +604,12 @@ function renderDetail(){
   h+='<div><div class="fl">중요도 '+tip('높음으로 두면 달력 칸에 항상 표시돼요')+'</div>'+seg('priority',it.priority,[['low','낮음'],['normal','보통'],['high','높음','ph']])+'</div>';
   h+='<div class="row2"><div><div class="fl">시작일</div><input class="fi" type="date" id="d-start" data-f="start" min="'+RMIN+'" max="'+RMAX+'" value="'+esc(it.start)+'"></div>';
   h+='<div><div class="fl">기한 <span class="dday" id="d-dday" style="color:'+(isLate(it)?'var(--over)':'var(--fg)')+'">'+ddayTxt(it.due)+'</span></div><input class="fi" type="date" id="d-due" data-f="due" min="'+RMIN+'" max="'+RMAX+'" value="'+esc(it.due)+'"></div></div>';
-  h+='<div class="warnline" id="d-warn">'+(wk(it.due)?'주말 날짜는 월~금 달력에 보이지 않아요.':'')+'</div>';
+  h+='<div class="warnline" id="d-warn">'+(wk(it.due)?'주말은 달력에 안 보여요':'')+'</div>';
   h+='<div><div class="fl">담당자</div><input class="fi" id="d-who" data-f="assignees" value="'+esc(it.assignees.map(a=>'@'+a).join(' '))+'" placeholder="@나 @김과장"></div>';
   h+='<div><div class="fl">분류 (해시태그)</div><input class="fi" id="d-tags" data-f="tags" value="'+esc(it.tags.map(a=>'#'+a).join(' '))+'" placeholder="#보고 #예산"></div>';
   h+='<div><div class="fl">문서 링크 <span>'+(it.links.length?it.links.length+'개':'')+'</span>'+tip('경로를 붙여넣거나 파일을 이 패널에 끌어다 놓으세요\n(탐색기에서 Ctrl+Shift+C로 경로 복사)'+(LOCAL?'':'\n\n이 미리보기에선 열기 대신 경로 복사로 동작해요. 내부망 HTML에선 열려요.'),1)+'</div>';
   it.links.forEach(l=>{
-    h+='<div class="lk">'+xb(l)+'<div class="lk-m"><button class="lk-n" data-act="lkopen" data-l="'+l.id+'" title="열기">'+esc(l.name)+'</button><div class="lk-p" title="'+esc(l.path)+'">'+(l.path?esc(l.path):'<span style="color:var(--warn);font-family:var(--font)">경로 없음'+(l.h?' · PDF·이미지만 열 수 있어요':'')+'</span>')+'</div></div>';
+    h+='<div class="lk">'+xb(l)+'<div class="lk-m"><button class="lk-n" data-act="lkopen" data-l="'+l.id+'" title="열기">'+esc(l.name)+'</button><div class="lk-p" title="'+esc(l.path)+'">'+(l.path?esc(l.path):'<span style="color:var(--ember);font-family:var(--font)">경로 없음'+(l.h?' · PDF·이미지만 열 수 있어요':'')+'</span>')+'</div></div>';
     if(l.path){h+='<button class="ib sm" data-act="lkcopy" data-l="'+l.id+'" aria-label="경로 복사" title="경로 복사"><svg class="i"><use href="#i-copy"/></svg></button>';if(!isURL(l.path))h+='<button class="ib sm" data-act="lkfolder" data-l="'+l.id+'" aria-label="폴더 경로 복사" title="폴더 경로 복사"><svg class="i"><use href="#i-folder"/></svg></button>';}
     h+='<button class="ib sm" data-act="lkdel" data-l="'+l.id+'" aria-label="링크 삭제" title="링크 삭제"><svg class="i"><use href="#i-x"/></svg></button></div>';
   });
@@ -677,12 +673,12 @@ function defaultDay(){
   if(TODAY.startsWith(m.y+'-'+pad(m.m+1)))return TODAY;
   return K(weeksOf(m.y,m.m)[0].find(d=>d.getMonth()===m.m));
 }
-function weekdayShift(k){const d=P(k),w=d.getDay();if(w===6)return {k:K(addD(d,-1)),moved:'토요일이라 금요일로 옮겼어요'};if(w===0)return {k:K(addD(d,1)),moved:'일요일이라 월요일로 옮겼어요'};return {k,moved:''};}
+function weekdayShift(k){const d=P(k),w=d.getDay();if(w===6)return {k:K(addD(d,-1)),moved:'토 → 금'};if(w===0)return {k:K(addD(d,1)),moved:'일 → 월'};return {k,moved:''};}
 function addFromText(text,base){
   const p=parseQuick(text,base);
-  if(!p.title)return {err:'할 일 내용을 입력하세요.'};
+  if(!p.title)return {err:'제목을 입력하세요'};
   const sh=weekdayShift(p.date);
-  if(sh.k<RMIN||sh.k>RMAX)return {err:'달력 범위(2026년 11월~2027년 6월) 밖의 날짜예요.'};
+  if(sh.k<RMIN||sh.k>RMAX)return {err:'범위 밖 날짜 (2026.11 – 2027.6)'};
   const it={id:uid(),title:p.title,due:sh.k,start:'',status:'todo',priority:p.pr,assignees:p.who,tags:p.tags,memo:'',checklist:[]};
   S.items.push(it);save();return {it,moved:sh.moved};
 }
@@ -733,9 +729,9 @@ function renderModal(){
 renderModal=keepFocus(renderModal);
 function tabDays(){
   let h='<div class="blk"><h4>내 지정일 추가</h4><p class="help">창립기념일·휴가 등 나만의 날짜 '+tip('"칸 칠하기"를 켜면 공휴일처럼 그날 칸 전체에 색이 들어가요')+'</p>';
-  h+='<div class="form"><input class="fi" type="date" id="c-date" min="'+RMIN+'" max="'+RMAX+'" aria-label="날짜"><input class="fi" id="c-name" placeholder="창립기념일" aria-label="이름" style="flex:1;min-width:120px"><input type="color" id="c-color" value="#7c4dff" aria-label="색" style="width:42px;height:32px;border:1px solid var(--line);border-radius:6px;padding:0;background:none"><label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" id="c-off" checked>칸 칠하기</label><button class="btn pri" data-act="cadd">추가</button></div><div class="err" id="c-err"></div></div>';
+  h+='<div class="form"><input class="fi" type="date" id="c-date" min="'+RMIN+'" max="'+RMAX+'" aria-label="날짜"><input class="fi" id="c-name" placeholder="창립기념일" aria-label="이름" style="flex:1;min-width:120px"><input type="color" id="c-color" value="'+esc(cssVar('--c3')||'#c3a0e8')+'" aria-label="색"><label style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" id="c-off" checked>칸 칠하기</label><button class="btn pri" data-act="cadd">추가</button></div><div class="err" id="c-err"></div></div>';
   h+='<div class="blk"><h4>내 지정일 '+S.customs.length+'개</h4>';
-  if(!S.customs.length)h+='<div class="empty">아직 없어요.</div>';
+  if(!S.customs.length)h+='<div class="empty">지정일 없음</div>';
   S.customs.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(c=>{
     h+='<div class="lrow"><span class="d">'+fmtD(c.date)+'</span><input class="fi nm" id="cn-'+c.id+'" data-cn="'+c.id+'" value="'+esc(c.name)+'" aria-label="이름"><input type="color" id="cc-'+c.id+'" data-cc="'+c.id+'" value="'+esc(c.color)+'" aria-label="색"><label style="display:flex;gap:4px;align-items:center;font-size:12px;white-space:nowrap"><input type="checkbox" id="co-'+c.id+'" data-co="'+c.id+'"'+(c.off?' checked':'')+'>칠하기</label><button class="ib" data-act="cdel" data-id="'+c.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button></div>';
   });
@@ -744,23 +740,24 @@ function tabDays(){
   return h+'</div>';
 }
 function tabLinks(){
-  let h='<div class="guide"><div class="blk"><h4>문서를 날짜에 연결하는 방법</h4><ol>';
-  h+='<li><b>경로 붙여넣기 (추천)</b><br>탐색기에서 파일을 고르고(여러 개 가능) <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> → 달력에서 원하는 날짜 칸 위에 마우스를 올리고 <kbd>Ctrl</kbd>+<kbd>V</kbd>. 파일 이름으로 항목이 생기고 원본 경로가 연결돼요.</li>';
-  h+='<li><b>끌어다 놓기</b><br>파일을 날짜 칸에 놓으면 파일 이름으로 항목이 생겨요. 크롬은 보안상 폴더 위치를 알려주지 않아서, PDF·이미지 말고는 같은 칸에 경로를 한 번 더 붙여넣어야 원본이 열려요. 이름이 같으면 그 항목에 자동으로 이어져요.</li>';
-  h+='<li><b>웹 문서</b><br>그룹웨어나 문서관리시스템의 링크를 끌어다 놓거나 주소를 붙여넣으면 클릭 한 번에 열려요.</li>';
-  h+='<li><b>이미 있는 항목에 붙이기</b><br>항목을 열고 오른쪽 패널의 "문서 링크" 칸에 붙여넣거나, 패널에 파일을 끌어다 놓으세요.</li></ol></div>';
-  h+='<div class="blk"><h4>클릭하면 어떻게 열리나요</h4><p class="help">달력 칸의 클립 아이콘이나 패널의 파일 이름을 누르면 아래처럼 동작해요.</p>';
-  h+='<div class="trow"><b><span class="xb pdf">PDF</span><span class="xb">IMG</span></b><span>크롬 새 탭에서 원본이 바로 열려요.</span></div>';
-  h+='<div class="trow"><b><span class="xb xls">XLSX</span><span class="xb doc">DOCX</span><span class="xb ppt">PPTX</span></b><span>"Excel 열기" 같은 확인창이 뜨고 오피스에서 원본이 열려요. "항상 허용"에 체크해 두면 다음부터 바로 열려요. 회사 설정에 따라 막혀 있을 수 있어서, 그때를 대비해 경로도 함께 복사돼요.</span></div>';
-  h+='<div class="trow"><b><span class="xb hwp">HWP</span><span class="xb">기타</span></b><span>경로가 복사돼요. <kbd>Win</kbd>+<kbd>R</kbd> → <kbd>Ctrl</kbd>+<kbd>V</kbd> → <kbd>Enter</kbd> 하면 한글 등 기본 프로그램에서 원본이 열려요.</span></div>';
-  h+='<div class="trow"><b><span class="xb url">URL</span></b><span>새 탭에서 열려요.</span></div>';
-  h+='<div class="trow"><b><svg class="i"><use href="#i-folder"/></svg></b><span>폴더 경로가 복사돼요. 같은 방법(<kbd>Win</kbd>+<kbd>R</kbd>)으로 붙여넣으면 탐색기에서 그 폴더가 열려요.</span></div></div>';
-  h+='<div class="blk"><h4>알아두기</h4><p class="help">파일 자체는 저장하지 않고 위치만 기억해요. 파일을 옮기거나 이름을 바꾸면 링크가 끊기니, 그때는 경로를 다시 붙여넣으세요. 끌어다 놓아 생긴 "열기 권한"은 이 PC의 크롬에만 남고 백업 파일에는 들어가지 않아요(경로는 들어가요).'+(LOCAL?'':' 지금 보고 계신 claude.ai 미리보기에서는 PC 파일을 직접 열 수 없어요. 내부망 PC에서 HTML 파일로 열어 쓰세요.')+'</p></div></div>';
+  const row=(k,v,t)=>'<div class="trow"><b>'+k+'</b><span>'+v+(t?' '+tip(t,1):'')+'</span></div>';
+  let h='<div class="blk"><h4>연결하는 방법</h4>';
+  h+=row('경로 붙여넣기','Ctrl+Shift+C → 날짜 칸 위에서 Ctrl+V','탐색기에서 파일을 고르고(여러 개 가능) Ctrl+Shift+C\n달력의 날짜 칸에 마우스를 올리고 Ctrl+V\n파일 이름으로 항목이 생기고 원본 경로가 연결돼요');
+  h+=row('끌어다 놓기','파일을 날짜 칸에 놓기','크롬은 폴더 위치를 알려주지 않아요\nPDF·이미지 말고는 같은 칸에 경로를 한 번 더 붙여넣어야 원본이 열려요\n이름이 같으면 그 항목에 이어져요');
+  h+=row('웹 문서','링크를 놓거나 주소 붙여넣기');
+  h+=row('기존 항목','상세 패널 › 문서 링크');
+  h+='</div><div class="blk"><h4>누르면</h4>';
+  h+=row('<span class="xb pdf">PDF</span><span class="xb">IMG</span>','새 탭에서 열림');
+  h+=row('<span class="xb xls">XLSX</span><span class="xb doc">DOCX</span><span class="xb ppt">PPTX</span>','오피스로 열림','처음엔 확인창이 떠요 · "항상 허용" 권장\n회사 설정으로 막혀 있으면 함께 복사된 경로를 Win+R에 붙여넣기');
+  h+=row('<span class="xb hwp">HWP</span><span class="xb">기타</span>','경로 복사 → Win+R','Win+R → Ctrl+V → Enter 하면 기본 프로그램에서 열려요');
+  h+=row('<span class="xb url">URL</span>','새 탭에서 열림');
+  h+=row('<svg class="i" aria-label="폴더"><use href="#i-folder"/></svg>','폴더 경로 복사 → Win+R');
+  h+='</div><div class="blk"><h4>알아두기</h4><p class="help">파일이 아니라 위치만 저장 '+tip('파일을 옮기거나 이름을 바꾸면 경로를 다시 붙여넣으세요\n끌어다 놓아 생긴 열기 권한은 이 PC의 크롬에만 남아요 (백업엔 경로만)'+(LOCAL?'':'\nclaude.ai 미리보기에선 PC 파일을 못 열어요 · 내부망 PC의 HTML로 쓰세요'),1)+'</p></div>';
   return h;
 }
 function tabStyle(){
-  let h='<div class="blk"><h4>테마 프리셋</h4><p class="help">배경, 글자, 강조 면 색을 한 번에 바꿔요.</p><div class="presets">'+PRESETS.map((p,i)=>'<button data-act="preset" data-i="'+i+'"><span class="sw" style="background:'+(p[1].bg||'#100904')+'"></span><span class="sw" style="background:'+(p[1].fg||'#ffedd7')+'"></span>'+p[0]+'</button>').join('')+'</div></div>';
-  h+='<div class="blk"><h4>색상</h4><p class="help">"기본"을 누르면 처음 색으로 돌아가요.</p>';
+  let h='<div class="blk"><h4>테마 프리셋</h4><p class="help">색 한 번에 바꾸기</p><div class="presets">'+PRESETS.map((p,i)=>'<button data-act="preset" data-i="'+i+'"><span class="sw" style="background:'+(p[1].bg||'#100904')+'"></span><span class="sw" style="background:'+(p[1].fg||'#ffedd7')+'"></span>'+p[0]+'</button>').join('')+'</div></div>';
+  h+='<div class="blk"><h4>색상</h4><p class="help">"기본" = 처음 색</p>';
   STYLE_VARS.forEach(([k,v,l])=>{const cur=S.style[k]||cssVar(v)||'#000000';h+='<div class="srow"><span>'+l+(S.style[k]?'':' <span class="meta">(기본)</span>')+'</span><input type="color" id="sc-'+k+'" data-sk="'+k+'" value="'+esc(/^#[0-9a-f]{6}$/i.test(cur)?cur:'#000000')+'" aria-label="'+l+'"><button class="btn" data-act="sreset" data-k="'+k+'">기본</button></div>';});
   h+='</div><div class="blk"><h4>표시</h4>';
   h+='<div class="srow"><span>칸마다 미리보기 '+tip('중요 항목은 개수를 넘어도 항상 표시돼요')+'</span><select class="fi" id="s-max" data-so="maxPreview" style="width:auto">'+[2,3,4,5,6].map(n=>'<option'+(+S.style.maxPreview===n?' selected':'')+'>'+n+'</option>').join('')+'</select><span></span></div>';
@@ -779,15 +776,15 @@ function tabWp(){
   h+='<div class="srow"><span>배경색</span><input type="color" id="w-bg" data-wk="bg" value="'+esc(w.bg)+'"><span></span></div>';
   h+='<div class="srow"><span>공휴일 색</span><input type="color" id="w-hol" data-wk="hol" value="'+esc(w.hol)+'"><span></span></div>';
   h+='<div class="form" style="margin-top:12px"><button class="btn pri" data-act="wpmake">미리보기 만들기</button>'+(ui.wpUrl?'<button class="btn" data-act="wpsave">PNG 저장</button>':'')+'</div>';
-  if(ui.wpUrl)h+='<div class="wp-prev"><img src="'+ui.wpUrl+'" alt="바탕화면 미리보기"></div><p class="help" style="margin-top:8px">저장 버튼이 동작하지 않으면 이미지를 마우스 오른쪽 버튼으로 눌러 "다른 이름으로 이미지 저장"을 고르세요. 저장한 PNG를 바탕화면에서 오른쪽 클릭 → "바탕 화면 배경으로 설정" 하면 끝이에요.</p>';
+  if(ui.wpUrl)h+='<div class="wp-prev"><img src="'+ui.wpUrl+'" alt="바탕화면 미리보기"></div><p class="help" style="margin-top:8px">PNG 우클릭 → 바탕 화면 배경으로 설정 '+tip('저장 버튼이 안 되면 이미지를 우클릭 → 다른 이름으로 이미지 저장')+'</p>';
   return h+'</div>';
 }
 function tabData(){
   const ex=S.items.filter(i=>i.ex).length+S.customs.filter(c=>c.ex).length;
-  let h='<div class="blk"><h4>백업</h4><p class="help">데이터는 이 브라우저 안에만 저장돼요. 브라우저 기록을 지우거나 PC를 바꾸면 사라질 수 있으니 가끔 백업해 두세요. 이 페이지와 내부망 PC의 HTML 파일은 저장 공간이 서로 달라서, 옮길 때도 백업 → 불러오기를 쓰면 돼요.</p>';
+  let h='<div class="blk"><h4>백업</h4><p class="help">이 브라우저에만 저장됨 '+tip('브라우저 기록을 지우거나 PC를 바꾸면 사라질 수 있어요 · 가끔 백업하세요\n다른 PC·다른 파일로 옮길 때도 백업 → 불러오기')+'</p>';
   h+='<div class="form"><button class="btn pri" data-act="bkfile">백업 파일 저장 (.json)</button><button class="btn" data-act="bkcopy">백업 내용 복사</button></div>';
   h+='<textarea class="fi code" id="bk-out" readonly style="margin-top:8px" aria-label="백업 내용">'+esc(JSON.stringify(S))+'</textarea></div>';
-  h+='<div class="blk"><h4>불러오기</h4><p class="help">백업 파일을 고르거나 백업 내용을 붙여넣으세요. 지금 데이터는 백업 내용으로 바뀝니다.</p><div class="form"><input type="file" id="bk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="bk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기"></textarea><div class="form" style="margin-top:8px">'+(ui.arm==='imp'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-act="armimp">불러오기</button>')+'</div><div class="err" id="bk-err"></div></div>';
+  h+='<div class="blk"><h4>불러오기</h4><p class="help">지금 데이터를 덮어써요</p><div class="form"><input type="file" id="bk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="bk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기"></textarea><div class="form" style="margin-top:8px">'+(ui.arm==='imp'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-act="armimp">불러오기</button>')+'</div><div class="err" id="bk-err"></div></div>';
   h+='<div class="blk"><h4>정리</h4><div class="form">'+(ex?'<button class="btn" data-act="clearex">예시 항목 '+ex+'개 지우기</button>':'')+(ui.arm==='reset'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="reset">모두 지우기 확인</button>':'<button class="btn danger" data-act="armreset">모든 데이터 지우기</button>')+'</div></div>';
   return h;
 }
@@ -797,12 +794,13 @@ function lum(hex){const n=parseInt(hex.slice(1),16);return ((n>>16&255)*.299+(n>
 function rr(x,X,Y,W,H,R){x.beginPath();x.moveTo(X+R,Y);x.arcTo(X+W,Y,X+W,Y+H,R);x.arcTo(X+W,Y+H,X,Y+H,R);x.arcTo(X,Y+H,X,Y,R);x.arcTo(X,Y,X+W,Y,R);x.closePath();}
 function fit(x,t,w){if(x.measureText(t).width<=w)return t;while(t.length>1&&x.measureText(t+'…').width>w)t=t.slice(0,-1);return t+'…';}
 function hexA(h,a){const n=parseInt(h.slice(1),16);return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+','+a+')';}
-const WPC=['#a3c47a','#e6c95c','#c3a0e8','#e08fb6','#cdb79a'];
+const WPC_FALLBACK=['#a3c47a','#e6c95c','#c3a0e8','#e08fb6','#cdb79a'];
 function drawWallpaper(mi){
+  const WPC=TAGC.map((v,i)=>{const c=cssVar(v);return /^#[0-9a-f]{6}$/i.test(c)?c:WPC_FALLBACK[i];});
   const o=S.wp,W=Math.max(800,Math.min(7680,+o.w||1920)),H=Math.max(600,Math.min(4320,+o.h||1080));
   const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
   const light=lum(o.bg)>=.5,fg=light?'#1d1c1f':'#ffedd7',inv=o.bg;
-  const mute=light?'rgba(29,28,31,.66)':'rgba(255,237,215,.66)',faint=light?'rgba(29,28,31,.4)':'rgba(255,237,215,.4)',line=light?'rgba(29,28,31,.26)':'rgba(255,237,215,.24)';
+  const mute=light?'rgba(29,28,31,.66)':'rgba(255,237,215,.66)',line=light?'rgba(29,28,31,.26)':'rgba(255,237,215,.26)';
   x.fillStyle=o.bg;x.fillRect(0,0,W,H);
   const s=Math.min(W/1920,H/1080),F=(z)=>'500 '+Math.round(z*s)+'px '+FONT,sp=v=>{try{x.letterSpacing=v;}catch(e){}};
   let rx,rw;if(o.place==='right'){rx=W*.3;rw=W*.66;}else if(o.place==='center'){rx=W*.16;rw=W*.68;}else{rx=W*.05;rw=W*.9;}
@@ -824,7 +822,7 @@ function drawWallpaper(mi){
   x.restore();
   weeks.forEach((w,ri)=>w.forEach((d,ci)=>{
     const k=K(d),cx=rx+ci*colW,cy=gTop+ri*rowH,info=dayInfo(k),inM=d.getMonth()===m.m;
-    x.globalAlpha=inM?1:.38;
+    x.globalAlpha=inM?1:.58;
     x.font=F(24);x.fillStyle=info.hol?o.hol:fg;const dn=(d.getDate()===1?(d.getMonth()+1)+'/':'')+d.getDate();x.fillText(dn,cx+pd,cy+pd+22*s);
     let lx=cx+pd+x.measureText(dn).width+12*s;x.font=F(14);
     const labs=[];if(info.hol)labs.push([info.hol,o.hol]);info.customs.forEach(q=>labs.push([q.name,q.color]));
@@ -896,12 +894,12 @@ function openLink(l){
     const e=extOf(l.name||p);
     if(LOCAL&&VIEW_EXT.includes(e)){window.open(toFileURL(p),'_blank');return;}
     copyText(quoted(p));
-    if(LOCAL&&OFFICE[e]){const a=document.createElement('a');a.href=OFFICE[e]+':ofe|u|'+toFileURL(p);document.body.appendChild(a);a.click();a.remove();toast('오피스에서 여는 중이에요. 안 열리면 Win+R → Ctrl+V → Enter (경로 복사됨)');return;}
-    toast((LOCAL?'':'미리보기에서는 PC 파일을 직접 못 열어요. ')+'경로를 복사했어요 · Win+R → Ctrl+V → Enter로 열려요');
+    if(LOCAL&&OFFICE[e]){const a=document.createElement('a');a.href=OFFICE[e]+':ofe|u|'+toFileURL(p);document.body.appendChild(a);a.click();a.remove();toast('오피스로 여는 중 · 경로도 복사됨');return;}
+    toast((LOCAL?'경로 복사됨 · Win+R에 붙여넣기':'미리보기라 경로만 복사됨'));
     return;
   }
   if(l.h){openHandle(l);return;}
-  toast('연결된 경로가 없어요. 탐색기에서 Ctrl+Shift+C로 복사해 붙여넣으세요');
+  toast('경로 없음 · Ctrl+Shift+C로 복사해 붙여넣기');
 }
 async function openHandle(l){
   try{
@@ -910,8 +908,8 @@ async function openHandle(l){
     if(st!=='granted'){toast('파일을 읽을 권한이 필요해요');return;}
     const f=await h.getFile(),e=extOf(f.name);
     if(VIEW_EXT.includes(e)){const u=URL.createObjectURL(f);window.open(u,'_blank');setTimeout(()=>URL.revokeObjectURL(u),120000);}
-    else toast('크롬은 '+(e?e.toUpperCase():'이 형식')+' 파일을 직접 못 열어요. 경로를 붙여넣으면 원본을 열 수 있어요');
-  }catch(e){toast('파일을 찾지 못했어요. 옮겨졌거나 이름이 바뀌었을 수 있어요');}
+    else toast((e?e.toUpperCase():'이 형식')+'은 경로가 있어야 열려요');
+  }catch(e){toast('파일 없음 · 옮겨졌을 수 있어요');}
 }
 function attachLinks(it,links){
   it.links=it.links||[];
@@ -920,7 +918,7 @@ function attachLinks(it,links){
 }
 function placeLinks(links,k){
   const sh=weekdayShift(k);
-  if(sh.k<RMIN||sh.k>RMAX){toast('달력 범위(2026년 11월~2027년 6월) 밖의 날짜예요');return;}
+  if(sh.k<RMIN||sh.k>RMAX){toast('범위 밖 날짜 (2026.11 – 2027.6)');return;}
   let att=0;const made=[];
   links.forEach(l=>{
     const it=l.path&&S.items.find(i=>i.due===sh.k&&(i.links||[]).some(x=>!x.path&&x.name===l.name));
@@ -945,7 +943,7 @@ function handleDrop(e,k,itemId){
       const links=parts.map((x,j)=>({id:uid(),name:x.f?x.f.name:((hs[j]&&hs[j].name)||'문서'),path:'',h:!!(hs[j]&&hs[j].kind==='file')}));
       await Promise.all(links.map((l,j)=>l.h?putH(l.id,hs[j]).catch(()=>{l.h=false;}):null));
       if(itemId)linksToItem(itemId,links);else placeLinks(links,k);
-      if(links.some(l=>!(l.h&&VIEW_EXT.includes(extOf(l.name)))))setTimeout(()=>toast('원본을 열려면 경로도 필요해요 · 탐색기에서 Ctrl+Shift+C → 같은 칸에서 Ctrl+V'),2800);
+      if(links.some(l=>!(l.h&&VIEW_EXT.includes(extOf(l.name)))))setTimeout(()=>toast('원본은 경로 필요 · Ctrl+Shift+C → 같은 칸에 Ctrl+V'),2800);
     });
     return;
   }
@@ -965,7 +963,7 @@ function closeDetail(){
   const day=it?it.due:ui.selDay;if(day&&refocus('#grid .cell[data-day="'+day+'"]'))return;
   focusToday(false);
 }
-function go(n){const v=ui.mi+n;if(v<0||v>7){toast('2026년 11월부터 2027년 6월까지만 있어요');return;}ui.mi=v;ui.selDay=null;renderMain();}
+function go(n){const v=ui.mi+n;if(v<0||v>7){toast('2026.11 – 2027.6만 있어요');return;}ui.mi=v;ui.selDay=null;renderMain();}
 document.addEventListener('click',e=>{
   const t=e.target.closest('[data-act]');
   if(!t){if(e.target===$('ov'))closeModal();return;}
@@ -1003,8 +1001,8 @@ document.addEventListener('click',e=>{
    case 'openlink':{const x=S.items.find(i=>i.id===t.dataset.id);if(!x)break;if(x.links.length===1)openLink(x.links[0]);else{openItem(x.id);toast('문서가 '+x.links.length+'개라 항목을 열었어요');}break;}
    case 'lkopen':case 'lkcopy':case 'lkfolder':case 'lkdel':{const l=it&&it.links.find(x=>x.id===t.dataset.l);if(!l)break;
      if(a==='lkopen')openLink(l);
-     else if(a==='lkcopy'){copyText(isURL(l.path)?l.path:quoted(l.path));toast(isURL(l.path)?'주소를 복사했어요':'경로를 복사했어요 · Win+R → Ctrl+V → Enter로 열려요');}
-     else if(a==='lkfolder'){copyText(quoted(parentOf(l.path)));toast('폴더 경로를 복사했어요 · Win+R → Ctrl+V → Enter 하면 탐색기로 열려요');}
+     else if(a==='lkcopy'){copyText(isURL(l.path)?l.path:quoted(l.path));toast(isURL(l.path)?'주소를 복사했어요':'경로 복사됨 · Win+R에 붙여넣기');}
+     else if(a==='lkfolder'){copyText(quoted(parentOf(l.path)));toast('폴더 경로 복사됨 · Win+R에 붙여넣기');}
      else{it.links=it.links.filter(x=>x.id!==l.id);if(l.h)delH(l.id);delete it.ex;save();renderDetail();renderMain();}
      break;}
    case 'ckdel':if(it){it.checklist.splice(+t.dataset.i,1);save();renderDetail();}break;
@@ -1014,19 +1012,19 @@ document.addEventListener('click',e=>{
    case 'del':if(it)(it.links||[]).forEach(l=>{if(l.h)delH(l.id);});const dd=it&&it.due;S.items=S.items.filter(i=>i.id!==ui.sel);ui.sel=null;ui.arm=null;ui.detailRet=null;save();renderAll();toast('삭제했어요');if(dd)refocus('#grid .cell[data-day="'+dd+'"]');break;
    case 'stab':ui.stab=t.dataset.v;ui.arm=null;renderModal();break;
    case 'cadd':{const d=$('c-date').value,n=$('c-name').value.trim(),er=$('c-err');
-     if(!d||!n){er.textContent='날짜와 이름을 모두 입력하세요.';break;}
-     if(d<RMIN||d>RMAX){er.textContent='2026년 11월~2027년 6월 사이 날짜만 넣을 수 있어요.';break;}
+     if(!d||!n){er.textContent='날짜와 이름 필요';break;}
+     if(d<RMIN||d>RMAX){er.textContent='2026.11 – 2027.6 사이만 돼요';break;}
      S.customs.push({id:uid(),date:d,name:n,color:$('c-color').value,off:$('c-off').checked});save();renderModal();renderMain();
-     const w=P(d).getDay();toast(w===0||w===6?'추가했어요 (주말이라 금/월 칸에 작게 보여요)':'지정일을 추가했어요');break;}
+     const w=P(d).getDay();toast(w===0||w===6?'추가함 · 주말은 금/월 칸에 표시':'지정일을 추가했어요');break;}
    case 'cdel':S.customs=S.customs.filter(c=>c.id!==t.dataset.id);save();renderModal();renderMain();break;
    case 'preset':{const p=PRESETS[+t.dataset.i][1];STYLE_VARS.forEach(([k])=>{S.style[k]=p[k]||'';});save();applyStyle();renderModal();break;}
    case 'sreset':S.style[t.dataset.k]='';save();applyStyle();renderModal();break;
    case 'wpmake':{const sm=$('w-m');ui.wpMi=sm?+sm.value:ui.mi;makeWp();break;}
    case 'wpsave':{if(!ui.wpBlob)break;const m=MONTHS[ui.wpMi==null?ui.mi:ui.wpMi];download('달력_'+m.y+'-'+pad(m.m+1)+'.png',ui.wpBlob);break;}
    case 'bkfile':download('달력백업_'+TODAY+'.json',new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));break;
-   case 'bkcopy':{const ta=$('bk-out');const txt=ta.value;if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast('복사했어요. 메모장 등에 붙여넣어 보관하세요'),()=>{ta.select();toast('선택된 내용을 Ctrl+C로 복사하세요');});}else{ta.select();toast('선택된 내용을 Ctrl+C로 복사하세요');}break;}
-   case 'armimp':{if(!$('bk-in').value.trim()){$('bk-err').textContent='백업 파일을 고르거나 내용을 붙여넣으세요.';break;}ui.pendingImp=$('bk-in').value;ui.arm='imp';renderModal();$('bk-in').value=ui.pendingImp;break;}
-   case 'imp':{try{const s=JSON.parse(ui.pendingImp||$('bk-in').value);if(!s||!Array.isArray(s.items))throw 0;S=normalize(s);save();applyStyle();ui.sel=null;ui.arm=null;renderAll();renderModal();toast('불러왔어요 · 항목 '+S.items.length+'개');}catch(err){ui.arm=null;renderModal();$('bk-err').textContent='백업 형식이 아니에요. 이 달력에서 저장한 백업인지 확인하세요.';}break;}
+   case 'bkcopy':{const ta=$('bk-out');const txt=ta.value;if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast('복사했어요'),()=>{ta.select();toast('선택된 내용을 Ctrl+C로 복사하세요');});}else{ta.select();toast('선택된 내용을 Ctrl+C로 복사하세요');}break;}
+   case 'armimp':{if(!$('bk-in').value.trim()){$('bk-err').textContent='백업 파일이나 내용 필요';break;}ui.pendingImp=$('bk-in').value;ui.arm='imp';renderModal();$('bk-in').value=ui.pendingImp;break;}
+   case 'imp':{try{const s=JSON.parse(ui.pendingImp||$('bk-in').value);if(!s||!Array.isArray(s.items))throw 0;S=normalize(s);save();applyStyle();ui.sel=null;ui.arm=null;renderAll();renderModal();toast('불러왔어요 · 항목 '+S.items.length+'개');}catch(err){ui.arm=null;renderModal();$('bk-err').textContent='백업 형식이 아니에요';}break;}
    case 'armreset':ui.arm='reset';renderModal();break;
    case 'reset':S={items:[],customs:[],disabledHol:[],style:Object.assign({},DEF_STYLE),wp:Object.assign({},DEF_WP),tagColors:{}};ui.sel=null;ui.arm=null;save();applyStyle();renderAll();renderModal();toast('모두 지웠어요');break;
   }
@@ -1052,7 +1050,7 @@ $('detail').addEventListener('input',e=>{
   else if(f==='assignees')it.assignees=(t.value.match(/[^\s,@#]+/g)||[]);
   else if(f==='tags')it.tags=(t.value.match(/[^\s,#@]+/g)||[]);
   else if(f==='start')it.start=t.value;
-  else if(f==='due'){if(!t.value)return;it.due=t.value;$('d-dday').textContent=ddayTxt(it.due);$('d-dday').style.color=isLate(it)?'var(--over)':'var(--fg)';const w=P(it.due).getDay();$('d-warn').textContent=w===0||w===6?'주말 날짜는 월~금 달력에 보이지 않아요.':'';}
+  else if(f==='due'){if(!t.value)return;it.due=t.value;$('d-dday').textContent=ddayTxt(it.due);$('d-dday').style.color=isLate(it)?'var(--over)':'var(--fg)';const w=P(it.due).getDay();$('d-warn').textContent=w===0||w===6?'주말은 달력에 안 보여요':'';}
   else if(f==='ckt'){const c=it.checklist[+t.dataset.i];if(c)c.t=t.value;}
   save();soon();
 });
@@ -1062,7 +1060,7 @@ $('detail').addEventListener('change',e=>{
   if(t.dataset.f==='due'){const idx=MONTHS.findIndex(m=>it.due.startsWith(m.y+'-'+pad(m.m+1)));if(idx>=0&&idx!==ui.mi){ui.mi=idx;renderMain();}}
 });
 $('detail').addEventListener('keydown',e=>{
-  if(e.target.id==='lk-new'&&e.key==='Enter'&&!e.isComposing){const ls=parseLinks(e.target.value);if(!ls.length){$('lk-err').textContent='C:\\… 나 \\\\서버\\… 같은 파일 경로, 또는 http 주소를 넣어 주세요.';return;}linksToItem(ui.sel,ls);return;}
+  if(e.target.id==='lk-new'&&e.key==='Enter'&&!e.isComposing){const ls=parseLinks(e.target.value);if(!ls.length){$('lk-err').textContent='파일 경로나 http 주소만 돼요';return;}linksToItem(ui.sel,ls);return;}
   if(e.target.id==='ck-new'&&e.key==='Enter'&&!e.isComposing){const v=e.target.value.trim();const it=S.items.find(i=>i.id===ui.sel);if(v&&it){it.checklist.push({t:v,d:false});save();renderDetail();const n=$('ck-new');n&&n.focus();}}
 });
 $('modal').addEventListener('keydown',e=>{
