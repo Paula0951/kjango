@@ -90,7 +90,13 @@ const LEGACY = JSON.stringify({
       if (!inside) { errors.push('keyboard: Tab이 모달 밖으로 나감'); break; }
     }
     await page.keyboard.press('Escape');
+    // ⓘ에 포커스가 있으면 첫 Esc는 툴팁만 닫는다(WCAG 1.4.13) → 한 번 더
+    if (await page.locator('#ov').isVisible()) {
+      if (!(await page.evaluate(() => document.activeElement.classList.contains('ti')))) errors.push('keyboard: Esc로 모달이 안 닫힘');
+      await page.keyboard.press('Escape');
+    }
     await page.waitForTimeout(50);
+    if (await page.locator('#ov').isVisible()) errors.push('keyboard: 두 번째 Esc에도 모달이 안 닫힘');
     const after = await act();
     if (after !== start) errors.push(`keyboard: Esc 후 포커스 ${after} (기대 ${start})`);
     console.log(`  keyboard: start=${start} after-esc=${after}`);

@@ -136,14 +136,20 @@ input[type=checkbox]{accent-color:var(--fg)}
 .ib{width:34px;height:34px;border-radius:50%;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0}
 .ib:hover{border-color:var(--fg);color:var(--fg)}
 .ib.sm{width:26px;height:26px}.ib.sm svg.i{width:13px;height:13px}
+.ib.xs{position:relative;width:22px;height:22px}.ib.xs svg.i{width:13px;height:13px}
+.ib.xs::before{content:'';position:absolute;inset:-5px}.sbtn .dot::before{content:'';position:absolute;inset:-7px}
+.ck input[type=checkbox]{width:18px;height:18px;margin:0 3px;flex-shrink:0}
+.tline,.banner button,.lk-n{min-height:24px}
 .grow{flex:1}
 .ti::before{content:'';position:absolute;inset:-5px}
 .ti{position:relative;width:22px;height:22px;border-radius:50%;border:1px solid var(--faint);display:inline-flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0;vertical-align:middle;text-transform:none;letter-spacing:0}
 .ti svg.i{width:12px;height:12px}
 .ti:hover,.ti:focus-visible{border-color:var(--fg);color:var(--fg)}
-.ti::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 10px);left:-8px;width:max-content;max-width:min(300px,80vw);white-space:pre-line;text-align:left;background:var(--surface);color:var(--fg);border:1px solid var(--strong);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.65;letter-spacing:.02em;font-weight:500;opacity:0;pointer-events:none;z-index:60}
-.ti.r::after{left:auto;right:-8px}
-.ti:hover::after,.ti:focus-visible::after{opacity:1}
+/* 툴팁: role=tooltip 요소 (aria-describedby로 연결). 모양은 이전 ::after와 동일 */
+.ti .tt{position:absolute;bottom:calc(100% + 10px);left:-8px;width:max-content;max-width:min(300px,80vw);white-space:pre-line;text-align:left;background:var(--surface);color:var(--fg);border:1px solid var(--strong);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.65;letter-spacing:.02em;font-weight:500;opacity:0;pointer-events:none;z-index:60}
+.ti.r .tt{left:auto;right:-8px}
+.ti:hover .tt,.ti:focus-visible .tt{opacity:1}
+.ti.tt-off .tt{opacity:0!important}
 .tok{height:28px;min-width:28px;padding:0 9px;border-radius:999px;border:1px dashed var(--faint);color:var(--muted);font-size:13px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .tok:hover{border-style:solid;border-color:var(--fg);color:var(--fg)}
 
@@ -157,7 +163,7 @@ input[type=checkbox]{accent-color:var(--fg)}
 .sbtn.on{background:var(--surface);color:var(--fg);border:1px solid var(--fg);border-radius:999px;padding:10px 18px;margin:2px 0;text-decoration:none}
 .sbtn .n{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .sbtn.on .n{color:var(--fg)}
-.sbtn .dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;cursor:pointer;outline:1px solid var(--bg);box-shadow:none}
+.sbtn .dot{position:relative;width:11px;height:11px;border-radius:50%;flex-shrink:0;cursor:pointer;outline:1px solid var(--bg);box-shadow:none}
 .side-empty{font-size:13px;color:var(--muted);padding:6px 0}
 .detail{right:0;width:min(470px,100%);border-left:2px dashed var(--strong)}
 /* ≥1280px: 상세 패널은 덮지 않고 세 번째 그리드 컬럼이 된다 (달력 폭이 줄어듦) */
@@ -364,7 +370,8 @@ const pad=n=>String(n).padStart(2,'0');
 const K=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const P=s=>{const a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2]);};
 const addD=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
-const tip=(t,r)=>'<button type="button" class="ti'+(r?' r':'')+'" data-tip="'+String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" aria-label="도움말"><svg class="i"><use href="#i-info"/></svg></button>';
+let tipN=0;
+const tip=(t,r)=>{const id='tip-'+(++tipN);return '<button type="button" class="ti'+(r?' r':'')+'" aria-label="도움말" aria-describedby="'+id+'"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg><span class="tt" role="tooltip" id="'+id+'">'+String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))+'</span></button>';};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const DOW='일월화수목금토';
 const uid=()=>Math.random().toString(36).slice(2,10);
@@ -610,7 +617,7 @@ function renderDetail(){
   h+='<div><div class="fl">메모</div><textarea class="fi" id="d-memo" data-f="memo" placeholder="메모">'+esc(it.memo)+'</textarea></div>';
   const dn=it.checklist.filter(c=>c.d).length;
   h+='<div><div class="fl">체크리스트 <span>'+(it.checklist.length?dn+'/'+it.checklist.length:'')+'</span></div>';
-  it.checklist.forEach((c,i)=>{h+='<div class="ck'+(c.d?' dn':'')+'"><input type="checkbox" id="ck-'+i+'" data-ck="'+i+'"'+(c.d?' checked':'')+' aria-label="완료"><input type="text" id="ckt-'+i+'" data-f="ckt" data-i="'+i+'" value="'+esc(c.t)+'"><button class="ib" style="width:22px;height:22px" data-act="ckdel" data-i="'+i+'" aria-label="삭제"><svg class="i" style="width:13px;height:13px"><use href="#i-x"/></svg></button></div>';});
+  it.checklist.forEach((c,i)=>{h+='<div class="ck'+(c.d?' dn':'')+'"><input type="checkbox" id="ck-'+i+'" data-ck="'+i+'"'+(c.d?' checked':'')+' aria-label="완료"><input type="text" id="ckt-'+i+'" data-f="ckt" data-i="'+i+'" value="'+esc(c.t)+'"><button class="ib xs" data-act="ckdel" data-i="'+i+'" aria-label="항목 삭제"><svg class="i"><use href="#i-x"/></svg></button></div>';});
   h+='<input class="fi" id="ck-new" placeholder="하위 항목"></div>';
   h+='</div><div class="dfoot"><button class="btn" data-act="dup">복제</button><span class="grow"></span>';
   h+=ui.arm==='del'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="del">삭제 확인</button>':'<button class="btn danger" data-act="armdel">삭제</button>';
@@ -1076,6 +1083,7 @@ $('modal').addEventListener('change',e=>{
   save();renderMain();renderSide();
 });
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){const ti=[...document.querySelectorAll('.ti')].find(x=>!x.classList.contains('tt-off')&&(x===document.activeElement&&x.matches(':focus-visible')||x.matches(':hover')));if(ti){e.preventDefault();e.stopPropagation();ti.classList.add('tt-off');return;}}
   if(ui.modal&&e.key==='Tab'){const f=[...$('modal').querySelectorAll('button,a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(x=>!x.disabled&&x.offsetParent!==null);if(f.length){const a=f[0],z=f[f.length-1];if(e.shiftKey&&(document.activeElement===a||!$('modal').contains(document.activeElement))){e.preventDefault();z.focus();}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus();}}return;}
   if(!ui.modal&&e.target.classList&&e.target.classList.contains('cell')){const d=e.target.dataset.day;if(e.key==='Enter'||e.key===' '){e.preventDefault();ui.selDay=d;openModal('day');return;}const mv={ArrowLeft:-1,ArrowRight:1,ArrowUp:-5,ArrowDown:5}[e.key];if(mv){e.preventDefault();const cs=[...$('grid').querySelectorAll('.cell')],i=cs.indexOf(e.target)+mv;if(cs[i]){e.target.tabIndex=-1;cs[i].tabIndex=0;ui.fk=cs[i].dataset.day;cs[i].focus();}return;}if(e.key==='PageUp'){e.preventDefault();go(-1);return;}if(e.key==='PageDown'){e.preventDefault();go(1);return;}}
   if(e.key==='Escape'){if(ui.modal)closeModal();else if(ui.sel)closeDetail();else $('app').classList.remove('side-open');return;}
@@ -1099,6 +1107,8 @@ document.addEventListener('paste',e=>{
   if(ui.sel){linksToItem(ui.sel,ls);return;}
   placeLinks(ls,ui.selDay||defaultDay());
 });
+const ttOn=e=>{const ti=e.target.closest&&e.target.closest('.ti');if(ti&&!(e.relatedTarget&&ti.contains(e.relatedTarget)))ti.classList.remove('tt-off');};
+document.addEventListener('focusout',ttOn);document.addEventListener('mouseout',ttOn);
 document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('.cell[data-day]');ui.hoverDay=c?c.dataset.day:null;});
 const clearDrop=()=>document.querySelectorAll('.drop').forEach(x=>x.classList.remove('drop'));
 function dropZone(e){
