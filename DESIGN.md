@@ -31,6 +31,11 @@
 | `--strong` | fg 58% on bg | **Stitch** dashed separators, strike-through, out-of-month day numbers |
 | `--hol-bg` | `#2c1304` | Holiday cell fill |
 | `--today-bg` | `#2a1a0c` | Today cell tint (background only, no fill on the number) |
+| `--focus-tint` | `--surface` 35% on bg (`#1e120a`) | Focused input background (fg 16:1, placeholder 7.1:1) |
+| `--out` | `--surface` 30% on bg | Row hover in lists (NEXT UP, day modal) |
+| `--chip-h` | `--surface` 78% + fg | Primary button hover |
+
+Removed in v10 (were unused): `--chip`, `--accent`, `--accent-soft`, `--ok`, `--win`, `--warn` (use `--ember`). The modal scrim is `--bg` at 84%, never pure black.
 
 ### Category colors (the only chroma besides holidays)
 
@@ -63,7 +68,8 @@ Date markers (never a cream fill, so they can't be confused with urgent pills):
 
 - **Today** — 2px dashed cream frame around the whole cell + 2px ring on the (bold) day number + 11px `TODAY` + `#2a1a0c` tint + the weekday header (e.g. FRI 금) underlined. Earlier days of the month are dimmed (`past`: number `--strong`, chips 78%) so today is the brightest place on the screen.
 - **Holiday** — ember day number + ember label + `--hol-bg` cell.
-- **Custom day** — user color label (optional full-cell tint).
+- **Custom day** — user color label (optional full-cell tint). New days default to `--c3`.
+- **Overdue** (not done, due < today) — `D+n` label in `--over` beside the chip, never dimmed by `past`; `지연 D+n` badge in the day modal; hero stat `지연 N` (all months, number in `--over`). Text always accompanies the color.
 
 Selected controls (filter row `.sbtn.on`, segmented buttons `.seg .on`) use **Bark fill + 1px cream border** (+ `✓` on segments) — a selected control must not look like an urgent item.
 
@@ -73,8 +79,10 @@ Minimum legibility: any item text ≥ `--muted` (≈ 66%). `--faint` is only for
 
 - **Hover (day cell)**: `--hover` fill, 1px dashed `--strong` inner outline, contents lift 2px, `+` fades in. No scaling (it would break the shared dashed lines). Motion only under `prefers-reduced-motion: no-preference`.
 - **Focus**: 2px dashed cream outline (inset on cells so it coexists with the today frame).
-- **Keyboard**: cells are a roving-tabindex grid — arrows move day/week, Enter opens the day, PageUp/PageDown change month, Esc closes. Modals make the page `inert`, trap Tab, and restore focus on close.
-- **A11y**: `aria-current="date"` on today, descriptive `aria-label` per cell, `aria-pressed` on toggles, toast is `aria-live`, ⓘ hit area ≥ 24px.
+- **Input focus**: `2px dashed --fg` underline + `--focus-tint` (textarea: 2px dashed frame; quick-add box via `:focus-within`).
+- **Keyboard**: cells are a roving-tabindex grid — arrows move day/week, Enter opens the day, PageUp/PageDown or Alt+←/→ change month (bare arrows never change month), Esc closes. Modals make the page `inert`, trap Tab, and restore focus on close; settings opens on its selected tab.
+- **Focus restore**: re-renders restore focus by `id`/`data-*`. Opening an item focuses its title; closing the panel returns to the opener (chip / NEXT UP row), else the item's chip, else its day cell.
+- **A11y**: `aria-current="date"` on today, descriptive `aria-label` per cell and chip (title, 중요, status, 기한 지남), `aria-pressed` on toggles, toast is `aria-live`. ⓘ is `aria-describedby` → `<span role="tooltip">`; Esc on a focused/hovered ⓘ hides only the tooltip. Settings tabs are `tablist/tab/tabpanel` with ←/→/Home/End. Hit areas ≥ 24px (`::before{inset:-5px}` on 22px icons; checklist checkbox 18px by the spacing exception).
 
 ## 4. Separators — two weights ("stitches")
 
@@ -97,22 +105,23 @@ Never thicker than 2px; never solid; never a shadow. The wallpaper mirrors this:
 ## 6. Components
 
 - **Rail** (176px, slim): brand, month list (2 rows of year groups), 4 text tools at the bottom. No icons+labels clutter; right edge = stitch.
-- **Hero**: big month, stats (항목/중요/완료), ghost pill nav (prev/오늘/next), underline search (`검색`).
-- **Grid**: 5 columns, outer stitch frame, hairline inner lines. Cell = day number row (`.ch`) + notes + chips + "+N개 더".
+- **Hero**: big month, today line (`오늘 · 11월 13일 (금) · 3건 (중요 1)`, a dashed-underline button that jumps to and focuses the today cell), stats (항목/중요/완료/지연), ghost pill nav (prev/오늘/next), underline search (`검색`). At `max-height:780px` it compacts (no eyebrow, smaller title, controls in one row) along with the banner and quick-add.
+- **Grid**: 5 columns, outer stitch frame, hairline inner lines. Rows `minmax(96px,auto)`; the grid's min-height fills the viewport above quick-add, and the today cell is scrolled to center on load. Cell = day number row (`.ch`) + notes + chips + "+N개 더".
 - **Buttons**: ghost pill (1px cream border, 22px radius) default; filled Bark only for selected state. Radii: 12 cards/modals, 999 pills, 0 inputs.
 - **Inputs**: underline only (1px cream). Focus → dashed underline.
-- **Drawers**: filter (left of content, next to rail) and item detail (right, Slack-like). Stitch edges.
+- **Drawers**: filter (left of content, next to rail) and item detail (right, Slack-like). Stitch edges (`2px dashed --strong`). At ≥1280px the detail panel is a third grid column (`clamp(340px,24vw,440px)`) so the calendar reflows instead of being covered; below that it overlays.
 - **Modals**: day / all-months / settings (tabs). 2px dashed border.
-- **Token buttons** `# @ !`: 28px dashed-outline circles that insert syntax into the quick-add field.
-- **Info icon `.ti`**: 22px circle `ⓘ`; hover/focus shows a Bark tooltip (`white-space: pre-line`, 12.5px). `.r` variant anchors right to avoid clipping at panel/modal edges.
+- **Token buttons** `# @ !` + calendar icon: 28px dashed-outline circles that insert syntax into the quick-add field. The date token inserts the next weekday (`내일` when that is a weekday, else `M/D`) and advances one weekday per click.
+- **Drop targets**: while dragging a file, the cell / detail panel / day modal under the pointer shows a centered `여기에 놓기` pill (bg fill, 1px dashed cream).
+- **Info icon `.ti`**: 22px circle `ⓘ` (32px hit area); hover/focus shows a Bark tooltip (`white-space: pre-line`, 12.5px) rendered as a real `role=tooltip` element. `.r` variant anchors right to avoid clipping at panel/modal edges.
 
 ## 7. Text-input & copy rules (anti-wordiness)
 
 1. **Placeholder = a noun, ≤ 4 words.** `항목 추가` · `검색` · `메모` · `하위 항목` · `경로 또는 링크`.
 2. **Syntax is taught by icons, not sentences.** Quick-add shows `#` `@` `!` token buttons and one `ⓘ`.
 3. **Details go in the tooltip**, one idea per line (date formats, #/@/!, document paste/drag, preview-page limitation).
-4. **Hint line under inputs is empty until typing**, then shows only the parse result (`→ 11/20(금) · #보고 · @나 · 중요도 높음`).
-5. **Empty states ≤ 2 words** (`항목 없음`). Banners one line (`예시 15개  지우기`).
+4. **Hint line under quick-add appears on focus** with the default target (`→ 11월 13일 (금) · @나`), then shows only the parse result while typing (`→ 11/20(금) · #보고 · @나 · 중요도 높음`); empty again on blur.
+5. **Empty states ≤ 2 words** (`항목 없음`, `마감 없음`, `분류 없음 ⓘ`). Banners one line (`예시 15개  지우기`). Toasts are one short clause (`경로 복사됨 · Win+R에 붙여넣기`).
 6. Settings `p.help` ≤ one short phrase + `ⓘ` when more is needed. No paragraph-length helper text in the main flow.
 
 ## 8. Ember rules
@@ -121,7 +130,7 @@ Allowed: holiday date/label, holiday badge border, error hints. Not allowed: but
 
 ## 9. Wallpaper (canvas PNG, default 1920×1080)
 
-Dark canvas; uppercase English month; `MON–FRI` header; hairline dashed grid + 2px dashed outer frame; urgent = cream pill; done = `mute` + strike (not `faint`); today is **not** marked (static image); holiday cells ember @ 16% fill; placement right/center/full to clear desktop icons; bottom 10% reserved for the taskbar.
+Dark canvas; uppercase English month; `MON–FRI` header; hairline dashed grid (fg 26%, same as `--line`) + 2px dashed outer frame; urgent = cream pill; done = `mute` (fg 66%, same as `--muted`) + strike + `✓`; tag dots read the `--c0…c4` tokens; out-of-month days at 58% (= `--strong`, 6.1:1); today is **not** marked (static image); holiday cells ember @ 16% fill; placement right/center/full to clear desktop icons; bottom 10% reserved for the taskbar.
 
 ## 10. Do / Don't
 
@@ -138,7 +147,18 @@ Dark canvas; uppercase English month; `MON–FRI` header; hairline dashed grid +
 
 ## 12. Changelog
 
-**v9 (UI/UX review round)** — Opus review findings applied: color-coded categories + status glyphs; stronger today (frame, tinted cell, header, past-day dimming); hover/focus states; keyboard grid + modal focus trap; `--faint` 42→52%, holiday text `#f0661a`; fixed broken `# @ !` buttons; done items no longer show the cream 높음 badge; narrow-screen urgent pill; wallpaper shows tag dots, ✓ for done. Known open: detail panel still overlays THU/FRI; overdue not shown on the calendar.
+**v10 (review follow-up)** — one commit per item on `feat/review-fixes`:
+1. Detail panel is a grid column at ≥1280px (calendar reflows; THU/FRI and today stay visible); edge is now a 2px stitch.
+2. Overdue on the calendar: `D+n` in `--over` (6.2:1), not dimmed, `지연 N` hero stat, `지연` badge in the day modal, chip `aria-label`.
+3. Viewport fit: grid fills the space above quick-add, rows `minmax(96px,auto)`, compact hero/banner/quick-add at ≤780px height (1280×720: hero 185→102px), today cell centered on load, hero today line.
+4. Focus management: title on open, opener/chip/cell on close, focus kept across re-renders, all-months `+N개 더` jumps then opens the day, month change on Alt+←/→ / PgUp/PgDn.
+5. Tooltips are `role=tooltip` + `aria-describedby`; Esc closes only the tooltip; ≥24px hit areas.
+6. Settings tabs: `tablist/tab/tabpanel`, arrow keys, no longer clipped (27.8→50.5px row).
+7. Discoverability: `여기에 놓기` drop label, date token button, parse hint on focus.
+8. P2: ≤2-word empty states, short toasts, help paragraphs → phrase + ⓘ, custom-day default `--c3`, unused tokens removed, `--fs` fallback 14, wallpaper alphas match the app.
+9. Input focus: 2px dashed underline + `--focus-tint`.
+
+**v9 (UI/UX review round)** — Opus review findings applied: color-coded categories + status glyphs; stronger today (frame, tinted cell, header, past-day dimming); hover/focus states; keyboard grid + modal focus trap; `--faint` 42→52%, holiday text `#f0661a`; fixed broken `# @ !` buttons; done items no longer show the cream 높음 badge; narrow-screen urgent pill; wallpaper shows tag dots, ✓ for done. (Open items from v9 — detail overlay, overdue on the calendar — closed in v10.)
 
 **v8**
 1. **Separators** — introduced the two-tier system; major sections now 2px `--strong` stitches, hairline raised to 26% for legibility.
