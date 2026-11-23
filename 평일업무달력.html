@@ -368,6 +368,29 @@ button.wh:hover{background:var(--hover)}
 .empt{border:1px dashed var(--faint);border-radius:12px;padding:28px;display:flex;flex-direction:column;gap:14px;align-items:flex-start;max-width:560px}
 .empt h3{margin:0;font-weight:500;font-size:20px}
 @media (max-width:900px){#att .tools{flex-wrap:wrap;gap:6px 18px}.tool,.stat span{white-space:nowrap}.stat{flex-wrap:wrap;gap:10px 20px}.ab{max-width:100%;overflow:hidden;text-overflow:ellipsis}.modesw{margin:0;flex:0 0 160px}.wk{grid-template-columns:70px repeat(5,minmax(0,1fr))}.pc{font-size:11px;padding:6px 5px}.srow2{grid-template-columns:1fr}}
+
+/* 여러 칸 선택 · 접근성 */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#amodal .blk>h3{font-size:1em;font-weight:700;margin:1.33em 0}
+.btn.on{background:var(--fg);color:var(--bg)}
+.wk.multi .pc{touch-action:none}
+.pl{text-align:left}button.pl{cursor:pointer}button.pl:hover,.selb:hover{background:var(--hover)}
+.selb{font-size:12px;color:var(--muted);padding:6px 4px;min-height:32px}
+.pl.nb{cursor:default}
+@media (pointer:coarse){.pc{min-height:48px}.selb{min-height:44px}.ib{width:44px;height:44px}.btn{min-height:44px}}
+@media (max-width:640px){
+  .wk{grid-template-columns:56px repeat(5,minmax(0,1fr))}
+  .wh{padding:6px 2px;align-items:center;text-align:center}.wh .d{font-size:12px}.wh .ln{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+  .pl{padding:6px 4px;font-size:11px}.pl small{display:none}
+  .pc{padding:4px 2px;font-size:10px;overflow:hidden;word-break:keep-all;align-items:center;text-align:center}
+  .wsum{padding:6px 2px}
+  .ov{padding:0}.modal{width:100%;max-height:100%;border-radius:0;border-width:0}
+  #amodal .tw{overflow-x:auto}
+  #att .tt{position:fixed;left:16px;right:16px;bottom:16px;top:auto;width:auto;max-width:none}
+  .actbar .meta{display:none}.a-bar .meta{white-space:normal}.actbar{padding:8px 0;margin-top:8px}
+  .a-bar{max-width:100%}.a-bar>*{min-width:0;max-width:100%}.a-bar .seg{overflow-x:auto}
+  .wsum{overflow:hidden;word-break:keep-all;font-size:11px}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -1312,21 +1335,26 @@ function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map((
 function normA(s){
   const f=freshA();if(!s||typeof s!=='object')return f;
   const arr=v=>Array.isArray(v)?v:[],obj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+  const cid=v=>String(v==null?'':v).replace(/[^\w-]/g,'_');/* id는 HTML 속성에 그대로 들어가므로 [A-Za-z0-9_-]만 허용 */
+  const ci=x=>Object.assign({},x,{id:cid(x.id)});
+  const lectO={},attO={};
+  Object.entries(obj(s.lect)).forEach(([k,v])=>{const i=k.indexOf('|');lectO[i<0?k:k.slice(0,i+1)+cid(k.slice(i+1))]=Array.isArray(v)?v.map(x=>typeof x==='string'?cid(x):x):v;});
+  Object.entries(obj(s.att)).forEach(([k,v])=>{const i=k.indexOf('|');attO[i<0?k:k.slice(0,i+1)+cid(k.slice(i+1))]=v;});
   return {
-    tracks:arr(s.tracks).filter(t=>t&&t.id).map(t=>Object.assign({name:''},t)),
-    students:arr(s.students).filter(x=>x&&x.id).map(x=>Object.assign({name:'',track:'',no:'',admit:'',complete:'',commute:'Y',dorm:'',cnp:'N',memo:''},x)),
-    lecturers:arr(s.lecturers).filter(x=>x&&x.id).map(x=>Object.assign({name:'',subject:'',phone:'',memo:''},x)),
+    tracks:arr(s.tracks).filter(t=>t&&t.id).map(t=>Object.assign({name:''},ci(t))),
+    students:arr(s.students).filter(x=>x&&x.id).map(x=>Object.assign({name:'',track:'',no:'',admit:'',complete:'',commute:'Y',dorm:'',cnp:'N',memo:''},ci(x),{track:cid(x.track)})),
+    lecturers:arr(s.lecturers).filter(x=>x&&x.id).map(x=>Object.assign({name:'',subject:'',phone:'',memo:''},ci(x))),
     periods:arr(s.periods).length===NP?s.periods.map((p,i)=>({s:p&&p.s||DEF_P[i][0],e:p&&p.e||DEF_P[i][1]})):f.periods,
-    kinds:arr(s.kinds).filter(k=>k&&k.id).length?s.kinds.filter(k=>k&&k.id):f.kinds,
-    offs:arr(s.offs).filter(o=>o&&o.from).map(o=>Object.assign({to:'',kind:'event',name:'',track:'',periods:[]},o)),
-    lect:obj(s.lect),att:obj(s.att),disabledHol:arr(s.disabledHol),ex:!!s.ex
+    kinds:arr(s.kinds).filter(k=>k&&k.id).length?s.kinds.filter(k=>k&&k.id).map(ci):f.kinds,
+    offs:arr(s.offs).filter(o=>o&&o.from).map(o=>Object.assign({to:'',kind:'event',name:'',track:'',periods:[]},o,{id:cid(o.id),kind:cid(o.kind||'event'),track:cid(o.track)})),
+    lect:lectO,att:attO,disabledHol:arr(s.disabledHol),ex:!!s.ex
   };
 }
 function loadA(){try{const r=localStorage.getItem(AKEY);if(r)return normA(JSON.parse(r));}catch(e){}return freshA();}
 let A=loadA();
 function saveA(){SC.clear();try{localStorage.setItem(AKEY,JSON.stringify(A));}catch(e){}}
 
-const au={mi:0,track:'',view:'month',wk:null,modal:null,tab:null,day:null,dayTrack:'',sel:new Set(),arm:null,
+const au={mi:0,track:'',view:'month',wk:null,modal:null,tab:null,day:null,dayTrack:'',sel:new Set(),multi:false,arm:null,
   stat:{mode:'month',mi:0,from:AMIN,to:AMAX,track:'',upto:1},exp:{from:0,to:0,track:'',upto:1,sh:{daily:1,dsum:0,mstat:1,total:1,mrate:1,lcal:1,lhours:1,allow:1,roster:1}},
   stuF:'',opener:null};
 {const i=AM.findIndex(m=>TODAY.startsWith(ymOf(m)));au.mi=i>=0?i:(TODAY<AMIN?0:AM.length-1);au.stat.mi=au.mi;au.exp.from=au.mi;au.exp.to=au.mi;}
@@ -1526,14 +1554,16 @@ function renderMonth(){
   $('a-body').innerHTML=h+'</div></div>';
 }
 function weekCells(days,tid){/* 주 시간표 그리드 */
-  let h='<div class="wk" data-selroot><div class="wh c0"></div>';
+  let h='<div class="wk'+(au.multi?' multi':'')+'" data-selroot><div class="wh c0"></div>';
   days.forEach(k=>{const sc=sched(k,tid);h+='<button class="wh'+(k===TODAY?' tdy':'')+(sc.hol?' hol':'')+'" data-a="day" data-k="'+k+'"><span class="d">'+fmtS(k)+'</span><span class="ln" style="color:'+(sc.hol?'var(--hol-fg)':'var(--muted)')+'">'+esc(sc.hol||(sc.ps.length?(sc.ps.length<NP?sc.ps.length+'교시':'수업'):sc.why||'수업 없음'))+'</span></button>';});
+  h+='<div class="pl c0">하루 선택</div>';
+  days.forEach(k=>{h+='<button class="selb" data-a="selcol" data-k="'+k+'" aria-label="'+esc(fmtD(k))+' 전체 교시 선택">전체</button>';});
   PS.forEach(p=>{
     if(p===4)h+='<div class="lunch c0">점심 12:00 – 13:00</div>';
-    h+='<div class="pl c0">'+p+'교시<small>'+esc(A.periods[p-1].s)+'–'+esc(A.periods[p-1].e)+'</small></div>';
+    h+='<button class="pl c0" data-a="selrow" data-p="'+p+'" aria-label="'+p+'교시 전체 요일 선택">'+p+'교시<small>'+esc(A.periods[p-1].s)+'–'+esc(A.periods[p-1].e)+'</small></button>';
     days.forEach((k,di)=>{h+=pcell(k,tid,p,di);});
   });
-  h+='<div class="pl c0">출결</div>';
+  h+='<div class="pl c0 nb">출결</div>';
   days.forEach(k=>{const sc=sched(k,tid);h+='<div class="wsum">'+(sc.ps.length?daySummary(k,tid)+'<button class="tline" data-a="day" data-k="'+k+'">출결 입력</button>':'')+'</div>';});
   return h+'</div>';
 }
@@ -1555,8 +1585,9 @@ function defaultDayA(){const m=AM[au.mi];if(TODAY.startsWith(ymOf(m))&&!isWk(TOD
 function selTrack(){return au.modal==='day'?au.dayTrack:au.track;}
 function renderActBar(){
   const el=$('d-act')||$('a-act');if(!el)return;const n=au.sel.size;
-  if(!n){el.innerHTML='<span class="meta">교시 칸을 끌어서 고르세요 · Ctrl+클릭으로 추가</span>';return;}
-  let h='<b style="font-weight:500">선택 '+n+'칸</b><span class="sep"></span>';
+  const mt='<button class="btn'+(au.multi?' on':'')+'" data-a="multi" aria-pressed="'+au.multi+'">여러 칸 선택'+(au.multi?' 켜짐':'')+'</button>';
+  if(!n){el.innerHTML=mt+'<span class="meta">'+(au.multi?'칸을 누르거나 끌면 계속 추가돼요 (다시 누르면 빼기)':'칸을 끌어서 고르세요 · Ctrl+클릭으로 추가')+' · 교시·하루 이름을 누르면 한 줄 전체</span>';return;}
+  let h=mt+'<b style="font-weight:500" role="status">선택 '+n+'칸</b><span class="sep"></span>';
   if(A.lecturers.length){h+='<select class="fi" id="act-lec" aria-label="외부강사">'+A.lecturers.map(l=>'<option value="'+l.id+'"'+(l.id===au.lastLec?' selected':'')+'>'+esc(l.name)+(l.subject?' · '+esc(l.subject):'')+'</option>').join('')+'</select><button class="btn" data-a="aplec">강사 넣기</button>';}
   else h+='<button class="btn" data-a="open" data-m="lects">강사 명단 먼저 추가</button>';
   h+='<button class="btn" data-a="cllec">강사 비우기</button><span class="sep"></span>';
@@ -1642,23 +1673,23 @@ function mRoster(){
   if(!au.tab)au.tab='stu';
   let h=headA('학생부 <span class="meta" style="font-weight:400">직종 '+A.tracks.length+' · 학생 '+A.students.length+'명</span>')+tabsA([['stu','학생'],['trk','직종'],['paste','엑셀에서 붙여넣기']])+'<div class="mb set">';
   if(au.tab==='trk'){
-    h+='<div class="blk"><h4>직종 추가</h4><div class="form"><input class="fi" id="t-name" placeholder="예: 용접" aria-label="직종 이름" style="flex:1;min-width:160px"><button class="btn pri" data-a="tadd">추가</button></div></div><div class="blk"><h4>직종 '+A.tracks.length+'개</h4>';
+    h+='<div class="blk"><h3>직종 추가</h3><div class="form"><input class="fi" id="t-name" placeholder="예: 용접" aria-label="직종 이름" style="flex:1;min-width:160px"><button class="btn pri" data-a="tadd">추가</button></div></div><div class="blk"><h3>직종 '+A.tracks.length+'개</h3>';
     if(!A.tracks.length)h+='<div class="empty">직종 없음</div>';
     A.tracks.forEach((t,i)=>{const n=A.students.filter(s=>s.track===t.id).length;h+='<div class="lrow"><span class="d">'+(i+1)+'</span><input class="fi nm" id="tn-'+t.id+'" data-tn="'+t.id+'" value="'+esc(t.name)+'" aria-label="직종 이름"><span class="meta">학생 '+n+'명</span><button class="ib" data-a="tup" data-id="'+t.id+'" aria-label="위로" title="위로"><svg class="i" style="transform:rotate(90deg)"><use href="#i-l"/></svg></button>'+(au.arm==='t:'+t.id?'<button class="btn danger arm" data-a="tdel" data-id="'+t.id+'">'+(n?'학생 '+n+'명도 삭제':'삭제 확인')+'</button>':'<button class="ib" data-a="arm" data-v="t:'+t.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
     return h+'</div></div>';
   }
   if(au.tab==='paste'){
-    h+='<div class="blk"><h4>엑셀에서 복사 → 붙여넣기</h4><p class="help">열 순서: 이름 · 직종 · 입학일 · 수료일 · 통학(Y/N) · 기숙사 입소일 · 취성패(Y/N) · 번호 · 메모 '+tip('엑셀에서 칸을 골라 Ctrl+C → 아래에 Ctrl+V\n첫 줄이 "이름"으로 시작하면 제목줄로 보고 건너뛰어요\n없는 직종은 새로 만들어요\n날짜: 2026-12-01 · 2026.12.1 · 20261201 모두 돼요')+'</p>';
+    h+='<div class="blk"><h3>엑셀에서 복사 → 붙여넣기</h3><p class="help">열 순서: 이름 · 직종 · 입학일 · 수료일 · 통학(Y/N) · 기숙사 입소일 · 취성패(Y/N) · 번호 · 메모 '+tip('엑셀에서 칸을 골라 Ctrl+C → 아래에 Ctrl+V\n첫 줄이 "이름"으로 시작하면 제목줄로 보고 건너뛰어요\n없는 직종은 새로 만들어요\n날짜: 2026-12-01 · 2026.12.1 · 20261201 모두 돼요')+'</p>';
     h+='<textarea class="fi code" id="paste-in" style="min-height:180px" placeholder="이름&#9;직종&#9;입학일&#9;수료일&#9;통학&#9;기숙사 입소일&#9;취성패"></textarea><div class="form" style="margin-top:10px"><button class="btn pri" data-a="pasteimp">학생 추가</button></div><div class="err" id="paste-err"></div></div>';
     return h+'</div>';
   }
   if(!A.tracks.length){h+='<div class="empty">직종을 먼저 추가하세요 <button class="btn" data-a="tab" data-v="trk">직종 탭</button></div>';return h+'</div>';}
-  h+='<div class="blk"><h4>학생 추가</h4><div class="form"><input class="fi" id="n-name" placeholder="이름" aria-label="이름" style="width:110px"><select class="fi" id="n-track" aria-label="직종">'+trackOpts(au.stuF||au.track)+'</select><label class="meta">입학 <input class="fi" type="date" id="n-admit" min="2026-01-01" max="'+AMAX+'" value="'+(TODAY<AMIN?AMIN:TODAY)+'"></label><label class="meta">수료 <input class="fi" type="date" id="n-complete" max="2028-12-31"></label><label class="meta">통학 <select class="fi" id="n-commute"><option>Y</option><option>N</option></select></label><label class="meta">기숙사 입소 <input class="fi" type="date" id="n-dorm" max="'+AMAX+'"></label><label class="meta">취성패 <select class="fi" id="n-cnp"><option>N</option><option>Y</option></select></label><button class="btn pri" data-a="sadd">추가</button></div><div class="err" id="s-err"></div></div>';
+  h+='<div class="blk"><h3>학생 추가</h3><div class="form"><input class="fi" id="n-name" placeholder="이름" aria-label="이름" style="width:110px"><select class="fi" id="n-track" aria-label="직종">'+trackOpts(au.stuF||au.track)+'</select><label class="meta">입학 <input class="fi" type="date" id="n-admit" min="2026-01-01" max="'+AMAX+'" value="'+(TODAY<AMIN?AMIN:TODAY)+'"></label><label class="meta">수료 <input class="fi" type="date" id="n-complete" max="2028-12-31"></label><label class="meta">통학 <select class="fi" id="n-commute"><option>Y</option><option>N</option></select></label><label class="meta">기숙사 입소 <input class="fi" type="date" id="n-dorm" max="'+AMAX+'"></label><label class="meta">취성패 <select class="fi" id="n-cnp"><option>N</option><option>Y</option></select></label><button class="btn pri" data-a="sadd">추가</button></div><div class="err" id="s-err"></div></div>';
   h+='<div class="a-bar"><span class="lbl">보기</span>'+segA('stuf',au.stuF,[['','전체']].concat(A.tracks.map(t=>[t.id,t.name])))+tip('통학 = 기숙사 입소 전 통학 여부\n기숙사 입소일을 넣으면 그날부터 기숙(통학 N)으로 셈\n취성패 Y → 훈련참여수당 0원')+'</div>';
   const list=stuSorted(au.stuF);
   if(!list.length)h+='<div class="empty">학생 없음</div>';
   else{
-    h+='<div class="tw"><table class="atbl"><thead><tr><th>번호</th><th>이름</th><th>직종</th><th>입학일</th><th>수료일</th><th>통학</th><th>기숙사 입소일</th><th>취성패</th><th>메모</th><th>상태</th><th></th></tr></thead><tbody>';
+    h+='<div class="tw"><table class="atbl"><thead><tr><th>번호</th><th>이름</th><th>직종</th><th>입학일</th><th>수료일</th><th>통학</th><th>기숙사 입소일</th><th>취성패</th><th>메모</th><th>상태</th><th><span class="sr">작업</span></th></tr></thead><tbody>';
     list.forEach(s=>{
       const f=(fl,w,type)=>'<input class="fi" id="sf-'+fl+'-'+s.id+'" data-sid="'+s.id+'" data-f="'+fl+'"'+(type?' type="'+type+'"':'')+' value="'+esc(s[fl])+'" aria-label="'+fl+'"'+(w?' style="min-width:'+w+'px"':'')+'>';
       const yn=fl=>'<select class="fi" id="sf-'+fl+'-'+s.id+'" data-sid="'+s.id+'" data-f="'+fl+'" aria-label="'+fl+'"><option'+(s[fl]==='Y'?' selected':'')+'>Y</option><option'+(s[fl]==='N'?' selected':'')+'>N</option></select>';
@@ -1670,13 +1701,13 @@ function mRoster(){
 }
 /* ---- 외부강사 ---- */
 function mLects(){
-  let h=headA('외부강사 명단')+'<div class="mb set"><div class="blk"><h4>강사 추가</h4><div class="form"><input class="fi" id="l-name" placeholder="이름" aria-label="이름" style="width:120px"><input class="fi" id="l-subject" placeholder="과목" aria-label="과목" style="width:160px"><input class="fi" id="l-phone" placeholder="연락처" aria-label="연락처" style="width:140px"><button class="btn pri" data-a="ladd">추가</button></div><div class="err" id="l-err"></div></div>';
-  h+='<div class="blk"><h4>강사 '+A.lecturers.length+'명</h4>';
+  let h=headA('외부강사 명단')+'<div class="mb set"><div class="blk"><h3>강사 추가</h3><div class="form"><input class="fi" id="l-name" placeholder="이름" aria-label="이름" style="width:120px"><input class="fi" id="l-subject" placeholder="과목" aria-label="과목" style="width:160px"><input class="fi" id="l-phone" placeholder="연락처" aria-label="연락처" style="width:140px"><button class="btn pri" data-a="ladd">추가</button></div><div class="err" id="l-err"></div></div>';
+  h+='<div class="blk"><h3>강사 '+A.lecturers.length+'명</h3>';
   if(!A.lecturers.length)h+='<div class="empty">강사 없음</div>';
-  else{h+='<div class="tw"><table class="atbl"><thead><tr><th>이름</th><th>과목</th><th>연락처</th><th>메모</th><th></th></tr></thead><tbody>';
+  else{h+='<div class="tw"><table class="atbl"><thead><tr><th>이름</th><th>과목</th><th>연락처</th><th>메모</th><th><span class="sr">작업</span></th></tr></thead><tbody>';
     A.lecturers.forEach(l=>{const f=fl=>'<input class="fi" id="lf-'+fl+'-'+l.id+'" data-lid="'+l.id+'" data-f="'+fl+'" value="'+esc(l[fl])+'" aria-label="'+fl+'">';h+='<tr><td>'+f('name')+'</td><td>'+f('subject')+'</td><td>'+f('phone')+'</td><td>'+f('memo')+'</td><td>'+(au.arm==='l:'+l.id?'<button class="btn danger arm" data-a="ldel" data-id="'+l.id+'">삭제 확인</button>':'<button class="ib" data-a="arm" data-v="l:'+l.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</td></tr>';});
     h+='</tbody></table></div>';}
-  h+='</div><div class="blk"><h4>월별 시수 '+tip('1교시 = 1시수 · 수업 있는 교시만 셈')+'</h4>'+hoursTable(0,AM.length-1,'')+'</div>';
+  h+='</div><div class="blk"><h3>월별 시수 '+tip('1교시 = 1시수 · 수업 있는 교시만 셈')+'</h3>'+hoursTable(0,AM.length-1,'')+'</div>';
   return h+'</div>';
 }
 function hoursTable(fi,ti,tid){
@@ -1695,30 +1726,30 @@ function mDays(){
   if(!au.tab)au.tab='offs';
   let h=headA('수업일 설정')+tabsA([['offs','특이사항 명부'],['kinds','특이사항 종류'],['periods','교시 시간'],['hol','법정 공휴일']])+'<div class="mb set">';
   if(au.tab==='kinds'){
-    h+='<div class="blk"><h4>특이사항 종류</h4><p class="help">"수업 없음"을 켠 종류는 훈련소정일수에서 빠져요 '+tip('예) 방학·개별학습·자체 휴업일 → 수업 없음\n행사·특강처럼 수업은 하는 날 → 끔')+'</p>';
+    h+='<div class="blk"><h3>특이사항 종류</h3><p class="help">"수업 없음"을 켠 종류는 훈련소정일수에서 빠져요 '+tip('예) 방학·개별학습·자체 휴업일 → 수업 없음\n행사·특강처럼 수업은 하는 날 → 끔')+'</p>';
     A.kinds.forEach(k=>{const used=A.offs.some(o=>o.kind===k.id);h+='<div class="lrow"><input type="color" id="kc-'+k.id+'" data-kc="'+k.id+'" value="'+esc(k.color)+'" aria-label="색"><input class="fi nm" id="kn-'+k.id+'" data-kn="'+k.id+'" value="'+esc(k.name)+'" aria-label="이름"><label class="chk"><input type="checkbox" id="kx-'+k.id+'" data-kx="'+k.id+'"'+(k.noClass?' checked':'')+'>수업 없음</label>'+(used?'<span class="meta">사용 중</span>':'<button class="ib" data-a="kdel" data-id="'+k.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
     h+='<div class="form" style="margin-top:14px"><input class="fi" id="k-name" placeholder="새 종류 (예: 현장실습)" aria-label="새 종류" style="flex:1;min-width:160px"><label class="chk"><input type="checkbox" id="k-x" checked>수업 없음</label><button class="btn pri" data-a="kadd">추가</button></div></div>';
     return h+'</div>';
   }
   if(au.tab==='periods'){
-    h+='<div class="blk"><h4>교시 시간</h4><p class="help">하루 6교시 · 점심 12:00–13:00</p>';
+    h+='<div class="blk"><h3>교시 시간</h3><p class="help">하루 6교시 · 점심 12:00–13:00</p>';
     A.periods.forEach((p,i)=>{h+='<div class="lrow"><span class="d">'+(i+1)+'교시</span><input class="fi" type="time" id="ps-'+i+'" data-ps="'+i+'" value="'+esc(p.s)+'" aria-label="'+(i+1)+'교시 시작" style="width:auto"> – <input class="fi" type="time" id="pe-'+i+'" data-pe="'+i+'" value="'+esc(p.e)+'" aria-label="'+(i+1)+'교시 끝" style="width:auto"></div>';});
     h+='<div class="form" style="margin-top:12px"><button class="btn" data-a="pdef">기본값 (45분 수업)</button></div></div>';
     return h+'</div>';
   }
   if(au.tab==='hol'){
-    h+='<div class="blk"><h4>법정 공휴일</h4><p class="help">자동으로 수업 없는 날 '+tip('쉬지 않는 날은 꺼 두세요\n행정 달력의 공휴일 설정과는 따로예요')+'</p>';
+    h+='<div class="blk"><h3>법정 공휴일</h3><p class="help">자동으로 수업 없는 날 '+tip('쉬지 않는 날은 꺼 두세요\n행정 달력의 공휴일 설정과는 따로예요')+'</p>';
     Object.keys(HOL).filter(k=>k>=AMIN&&k<=AMAX).forEach(k=>{h+='<label class="lrow"><input type="checkbox" id="ah-'+k+'" data-ah="'+k+'"'+(A.disabledHol.includes(k)?'':' checked')+'><span class="d">'+fmtD(k).replace(/^/,P(k).getFullYear()+'. ')+'</span><span class="nm">'+esc(HOL[k])+(isWk(k)?' <span class="meta">(주말)</span>':'')+'</span></label>';});
     return h+'</div></div>';
   }
-  h+='<div class="blk"><h4>특이사항 추가</h4><p class="help">방학·개별학습·개교기념일 같은 자체 휴업일 '+tip('끝 날짜를 비우면 하루만\n교시를 안 고르면 하루 전체\n직종을 "전체"로 두면 모든 직종에 적용\n교시 단위는 주 시간표에서 끌어서 넣는 게 편해요')+'</p>';
+  h+='<div class="blk"><h3>특이사항 추가</h3><p class="help">방학·개별학습·개교기념일 같은 자체 휴업일 '+tip('끝 날짜를 비우면 하루만\n교시를 안 고르면 하루 전체\n직종을 "전체"로 두면 모든 직종에 적용\n교시 단위는 주 시간표에서 끌어서 넣는 게 편해요')+'</p>';
   h+='<div class="form"><label class="meta">시작 <input class="fi" type="date" id="o-from" min="'+AMIN+'" max="'+AMAX+'"></label><label class="meta">끝 <input class="fi" type="date" id="o-to" min="'+AMIN+'" max="'+AMAX+'"></label><select class="fi" id="o-kind" aria-label="종류">'+A.kinds.map(k=>'<option value="'+k.id+'">'+esc(k.name)+'</option>').join('')+'</select><input class="fi" id="o-name" placeholder="이름 (예: 겨울방학)" aria-label="이름" style="width:150px"><select class="fi" id="o-track" aria-label="직종">'+trackOpts('','전체 직종')+'</select></div>';
   h+='<div class="form" style="margin-top:10px"><span class="meta">교시</span><span class="pick">'+PS.map(p=>'<label><input type="checkbox" id="o-p'+p+'" data-op="'+p+'">'+p+'</label>').join('')+'</span><button class="btn pri" data-a="oadd">추가</button></div><div class="err" id="o-err"></div></div>';
   const list=A.offs.slice().sort((a,b)=>a.from.localeCompare(b.from));
-  h+='<div class="blk"><h4>명부 '+list.length+'건</h4>';
+  h+='<div class="blk"><h3>명부 '+list.length+'건</h3>';
   if(!list.length)h+='<div class="empty">특이사항 없음</div>';
   else{
-    h+='<div class="tw"><table class="atbl"><thead><tr><th>날짜</th><th>종류</th><th>이름</th><th>직종</th><th>교시</th><th class="r">수업일 영향</th><th></th></tr></thead><tbody>';
+    h+='<div class="tw"><table class="atbl"><thead><tr><th>날짜</th><th>종류</th><th>이름</th><th>직종</th><th>교시</th><th class="r">수업일 영향</th><th><span class="sr">작업</span></th></tr></thead><tbody>';
     list.forEach(o=>{const kd=kindOf(o),n=weekdays(o.from,o.to||o.from).filter(k=>!holOn(k)).length;
       h+='<tr><td>'+esc(fmtS(o.from)+(o.to&&o.to!==o.from?' – '+fmtS(o.to):''))+' <span class="meta">'+P(o.from).getFullYear()+'</span></td><td><span style="color:'+esc(kd.color)+'">●</span> '+esc(kd.name)+'</td><td><input class="fi" id="on-'+o.id+'" data-on="'+o.id+'" value="'+esc(o.name)+'" aria-label="이름"></td><td>'+(o.track?esc(trackName(o.track)):'전체')+'</td><td>'+(o.periods&&o.periods.length?o.periods.join('·'):'하루')+'</td><td class="r meta">'+(kd.noClass?'평일 '+n+'일 '+(o.periods&&o.periods.length?'교시 제외':'제외'):'수업함')+'</td><td><button class="ib" data-a="odel" data-id="'+o.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button></td></tr>';});
     h+='</tbody></table></div>';
@@ -1762,17 +1793,17 @@ function mStats(){
 const SHEETS=[['daily','일별 교시 출결표','달마다 시트 · 학생 × 날짜×교시 · 외부강사 줄 포함'],['dsum','일별 출결 요약','달마다 시트 · 하루 한 칸'],['mstat','월별 통계','달마다 학생별 소정일·출석·결석'],['total','누적 통계','고른 기간 전체'],['mrate','월별 출석률 표','학생 × 달'],['lcal','외부강사 내역 (달력)','달마다 달력 모양 + 강사별 시수'],['lhours','외부강사 월별 시수','강사 × 달, 직종별'],['allow','수당 기초자료','통학·기숙 출석일, 취성패'],['roster','명부','학생부 · 강사 명단 · 수업일 명부']];
 function mExport(){
   const x=au.exp;
-  let h=headA('엑셀 내보내기')+'<div class="mb set"><div class="blk"><h4>범위</h4><div class="form"><select class="fi" id="ex-from" aria-label="시작 달">'+monthOpts(x.from)+'</select> – <select class="fi" id="ex-to" aria-label="끝 달">'+monthOpts(x.to)+'</select><select class="fi" id="ex-track" aria-label="직종">'+trackOpts(x.track,'전체 직종')+'</select><button class="btn" data-a="exall">전체 기간</button></div><label class="chk" style="margin-top:8px"><input type="checkbox" id="ex-upto"'+(x.upto?' checked':'')+'>오늘('+TODAY.replace(/-/g,'.')+')까지만 출결 집계 <span class="meta">끄면 미래 날짜도 출석으로 셈 · 강사 시수는 예정 포함</span></label></div>';
-  h+='<div class="blk"><h4>시트</h4>';
+  let h=headA('엑셀 내보내기')+'<div class="mb set"><div class="blk"><h3>범위</h3><div class="form"><select class="fi" id="ex-from" aria-label="시작 달">'+monthOpts(x.from)+'</select> – <select class="fi" id="ex-to" aria-label="끝 달">'+monthOpts(x.to)+'</select><select class="fi" id="ex-track" aria-label="직종">'+trackOpts(x.track,'전체 직종')+'</select><button class="btn" data-a="exall">전체 기간</button></div><label class="chk" style="margin-top:8px"><input type="checkbox" id="ex-upto"'+(x.upto?' checked':'')+'>오늘('+TODAY.replace(/-/g,'.')+')까지만 출결 집계 <span class="meta">끄면 미래 날짜도 출석으로 셈 · 강사 시수는 예정 포함</span></label></div>';
+  h+='<div class="blk"><h3>시트</h3>';
   SHEETS.forEach(([k,l,d])=>{h+='<label class="chk"><input type="checkbox" id="ex-'+k+'" data-exs="'+k+'"'+(x.sh[k]?' checked':'')+'>'+l+' <span class="meta">'+d+'</span></label>';});
   h+='</div><div class="form"><button class="btn pri" data-a="exgo">xlsx 저장</button><span class="meta">엑셀·한셀·구글 시트에서 열려요</span></div></div>';
   return h;
 }
 /* ---- 백업 ---- */
 function mData(){
-  let h=headA('출석 데이터 · 백업')+'<div class="mb set"><div class="blk"><h4>백업</h4><p class="help">이 브라우저에만 저장됨 '+tip('행정 달력과 따로 저장돼요\n브라우저 기록을 지우면 사라질 수 있으니 가끔 백업하세요')+'</p><div class="form"><button class="btn pri" data-a="bk">백업 파일 저장 (.json)</button></div></div>';
-  h+='<div class="blk"><h4>불러오기</h4><p class="help">지금 출석 데이터를 덮어써요</p><div class="form"><input type="file" id="abk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="abk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기"></textarea><div class="form" style="margin-top:8px">'+(au.arm==='imp'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-a="arm" data-v="imp">불러오기</button>')+'</div><div class="err" id="abk-err"></div></div>';
-  h+='<div class="blk"><h4>정리</h4><div class="form">'+(A.ex?'<button class="btn" data-a="clearex">예시 데이터 지우기</button>':'<button class="btn" data-a="sample">예시 데이터 넣기</button>')+(au.arm==='reset'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="reset">모두 지우기 확인</button>':'<button class="btn danger" data-a="arm" data-v="reset">출석 데이터 모두 지우기</button>')+'</div></div>';
+  let h=headA('출석 데이터 · 백업')+'<div class="mb set"><div class="blk"><h3>백업</h3><p class="help">이 브라우저에만 저장됨 '+tip('행정 달력과 따로 저장돼요\n브라우저 기록을 지우면 사라질 수 있으니 가끔 백업하세요')+'</p><div class="form"><button class="btn pri" data-a="bk">백업 파일 저장 (.json)</button></div></div>';
+  h+='<div class="blk"><h3>불러오기</h3><p class="help">지금 출석 데이터를 덮어써요</p><div class="form"><input type="file" id="abk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="abk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기"></textarea><div class="form" style="margin-top:8px">'+(au.arm==='imp'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-a="armimp">불러오기</button>')+'</div><div class="err" id="abk-err"></div></div>';
+  h+='<div class="blk"><h3>정리</h3><div class="form">'+(A.ex?'<button class="btn" data-a="clearex">예시 데이터 지우기</button>':'<button class="btn" data-a="sample">예시 데이터 넣기</button>')+(au.arm==='reset'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="reset">모두 지우기 확인</button>':'<button class="btn danger" data-a="arm" data-v="reset">출석 데이터 모두 지우기</button>')+'</div></div>';
   return h+'</div>';
 }
 
@@ -2089,6 +2120,11 @@ document.addEventListener('click',e=>{
     case 'apoff':{const k=$('act-kind').value;au.lastKind=k;applyOff(k,$('act-name').value.trim());break;}
     case 'cloff':clearOff();break;
     case 'clsel':au.sel.clear();paintSel();renderActBar();break;
+    case 'multi':au.multi=!au.multi;document.querySelectorAll('.wk').forEach(x=>x.classList.toggle('multi',au.multi));renderActBar();break;
+    case 'selrow':case 'selcol':{
+      const ks=a==='selrow'?[...document.querySelectorAll('.wk [data-pc]')].filter(x=>+x.dataset.p===+t.dataset.p):[...document.querySelectorAll('.wk [data-pc]')].filter(x=>x.dataset.k===t.dataset.k);
+      const keys=ks.map(x=>x.dataset.k+'|'+x.dataset.p),all=keys.every(q=>au.sel.has(q));
+      keys.forEach(q=>all?au.sel.delete(q):au.sel.add(q));paintSel();renderActBar();break;}
     /* 하루 */
     case 'dayprev':case 'daynext':{const k=stepDay(au.day,a==='dayprev'?-1:1);if(!k){toast(ALAB+'만 있어요');break;}au.day=k;au.sel.clear();const i=AM.findIndex(m=>k.startsWith(ymOf(m)));if(i>=0&&i!==au.mi){au.mi=i;}renderAM();renderA();break;}
     case 'dtrack':au.dayTrack=v;au.sel.clear();renderAM();break;
@@ -2100,6 +2136,7 @@ document.addEventListener('click',e=>{
     case 'allok':stuSorted(au.dayTrack).forEach(s=>{const key=au.day+'|'+s.id,r=A.att[key];if(r){if(r.m)A.att[key]={s:'출석',m:r.m};else delete A.att[key];}});saveA();renderAM();renderA();toast('모두 출석으로 바꿨어요');break;
     /* 학생부 */
     case 'arm':au.arm=v;renderAM();break;
+    case 'armimp':{if(!$('abk-in').value.trim()){$('abk-err').textContent='백업 파일이나 내용 필요';break;}au.pendingImp=$('abk-in').value;au.arm='imp';renderAM();$('abk-in').value=au.pendingImp;break;}
     case 'disarm':au.arm=null;renderAM();break;
     case 'stuf':au.stuF=v;renderAM();break;
     case 'tadd':{const n=$('t-name').value.trim();if(!n)break;if(A.tracks.some(x=>x.name===n)){toast('이미 있는 직종');break;}A.tracks.push({id:uid(),name:n});saveA();renderAM();renderA();const f=$('t-name');f&&f.focus();break;}
@@ -2129,18 +2166,18 @@ document.addEventListener('click',e=>{
     case 'exgo':doExport();break;
     /* 백업 */
     case 'bk':download('출석백업_'+TODAY+'.json',new Blob([JSON.stringify(A,null,1)],{type:'application/json'}));break;
-    case 'imp':{try{const s=JSON.parse($('abk-in').value||au.pendingImp||'');if(!s||!Array.isArray(s.students))throw 0;A=normA(s);saveA();au.arm=null;au.track='';renderAM();renderA();toast('불러왔어요 · 학생 '+A.students.length+'명');}catch(err){au.arm=null;renderAM();$('abk-err').textContent='출석 백업 형식이 아니에요';}break;}
+    case 'imp':{try{const s=JSON.parse(au.pendingImp||$('abk-in').value||'');if(!s||!Array.isArray(s.students))throw 0;A=normA(s);saveA();au.arm=null;au.track='';renderAM();renderA();toast('불러왔어요 · 학생 '+A.students.length+'명');}catch(err){au.arm=null;renderAM();$('abk-err').textContent='출석 백업 형식이 아니에요';}break;}
     case 'reset':A=freshA();au.arm=null;au.track='';saveA();renderAM();renderA();toast('출석 데이터를 지웠어요');break;
   }
-  if(a==='arm'&&v==='imp'){au.pendingImp=null;}
 });
 /* 끌어서 교시 고르기 */
 let drag=null;
-document.addEventListener('mousedown',e=>{
+document.addEventListener('pointerdown',e=>{
   if(!isAtt()||e.button!==0)return;const c=e.target.closest('[data-pc]');if(!c)return;
-  e.preventDefault();const add=e.ctrlKey||e.metaKey||e.shiftKey;
-  drag={base:add?new Set(au.sel):new Set(),a:[+c.dataset.di,+c.dataset.p],root:c.closest('[data-selroot]'),moved:false,start:c,toggle:add&&au.sel.has(c.dataset.k+'|'+c.dataset.p)};
-  dragTo(c);c.focus({preventScroll:true});
+  if(e.pointerType==='mouse')e.preventDefault();
+  const add=e.ctrlKey||e.metaKey||e.shiftKey||au.multi;
+  drag={base:add?new Set(au.sel):new Set(),orig:new Set(au.sel),a:[+c.dataset.di,+c.dataset.p],root:c.closest('[data-selroot]'),moved:false,start:c,toggle:add&&au.sel.has(c.dataset.k+'|'+c.dataset.p)};
+  dragTo(c);if(e.pointerType==='mouse')c.focus({preventScroll:true});
 });
 function dragTo(c){
   const b=[+c.dataset.di,+c.dataset.p],d0=Math.min(drag.a[0],b[0]),d1=Math.max(drag.a[0],b[0]),p0=Math.min(drag.a[1],b[1]),p1=Math.max(drag.a[1],b[1]);
@@ -2148,8 +2185,9 @@ function dragTo(c){
   drag.root.querySelectorAll('[data-pc]').forEach(x=>{const di=+x.dataset.di,p=+x.dataset.p;if(di>=d0&&di<=d1&&p>=p0&&p<=p1)au.sel.add(x.dataset.k+'|'+p);});
   paintSel();
 }
-document.addEventListener('mouseover',e=>{if(!drag)return;const c=e.target.closest&&e.target.closest('[data-pc]');if(c&&drag.root.contains(c)){if(c!==drag.start)drag.moved=true;dragTo(c);}});
-document.addEventListener('mouseup',()=>{if(!drag)return;if(!drag.moved&&drag.toggle){au.sel.delete(drag.start.dataset.k+'|'+drag.start.dataset.p);paintSel();}drag=null;renderActBar();});
+document.addEventListener('pointermove',e=>{if(!drag)return;const el=document.elementFromPoint(e.clientX,e.clientY),c=el&&el.closest&&el.closest('[data-pc]');if(c&&drag.root.contains(c)){if(c!==drag.start)drag.moved=true;dragTo(c);}});
+document.addEventListener('pointerup',()=>{if(!drag)return;if(!drag.moved&&drag.toggle){au.sel.delete(drag.start.dataset.k+'|'+drag.start.dataset.p);paintSel();}drag=null;renderActBar();});
+document.addEventListener('pointercancel',()=>{if(!drag)return;au.sel=drag.orig;drag=null;paintSel();renderActBar();});
 
 $('amodal').addEventListener('input',e=>{
   const t=e.target;
