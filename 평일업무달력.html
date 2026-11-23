@@ -1282,13 +1282,13 @@ function dropZone(e){
   return null;
 }
 document.addEventListener('dragover',e=>{
-  e.preventDefault();if(document.body.dataset.mode==='att')return;const z=dropZone(e);
+  if(document.body.dataset.mode==='att'){if(!(e.target.closest&&e.target.closest('input[type=file]')))e.preventDefault();return;}e.preventDefault();const z=dropZone(e);
   document.querySelectorAll('.drop').forEach(x=>{if(!z||x!==z.el)x.classList.remove('drop');});
   if(z){z.el.classList.add('drop');if(e.dataTransfer)e.dataTransfer.dropEffect='copy';}else if(e.dataTransfer)e.dataTransfer.dropEffect='none';
 });
 document.addEventListener('dragleave',e=>{if(!e.relatedTarget)clearDrop();});
 document.addEventListener('drop',e=>{
-  e.preventDefault();if(document.body.dataset.mode==='att')return;clearDrop();const z=dropZone(e);if(!z)return;
+  if(document.body.dataset.mode==='att'){if(!(e.target.closest&&e.target.closest('input[type=file]')))e.preventDefault();return;}e.preventDefault();clearDrop();const z=dropZone(e);if(!z)return;
   if(z.item)handleDrop(e,null,z.item);else handleDrop(e,z.day);
 });
 
@@ -1332,22 +1332,27 @@ const pct=v=>v==null?'–':(Math.round(v*1000)/10)+'%';
 
 /* ---------- state ---------- */
 function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map(([s,e])=>({s,e})),kinds:defKinds(),offs:[],lect:{},att:{},disabledHol:[]};}
+/* 불러온 데이터 검증: id·날짜·교시·색은 형식이 맞는 것만 (HTML 속성에 들어가므로) */
+const ID_RE=/^[A-Za-z0-9_-]{1,40}$/,DATE_RE=/^\d{4}-\d{2}-\d{2}$/,TIME_RE=/^\d{2}:\d{2}$/,HEX_RE=/^#[0-9a-fA-F]{6}$/;
+const okId=v=>typeof v==='string'&&ID_RE.test(v),okDate=v=>typeof v==='string'&&DATE_RE.test(v)?v:'',str=v=>v==null?'':String(v).slice(0,200);
+const okPs=v=>Array.isArray(v)?[...new Set(v.map(Number).filter(p=>Number.isInteger(p)&&p>=1&&p<=NP))].sort((a,b)=>a-b):[];
 function normA(s){
   const f=freshA();if(!s||typeof s!=='object')return f;
-  const arr=v=>Array.isArray(v)?v:[],obj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
-  const cid=v=>String(v==null?'':v).replace(/[^\w-]/g,'_');/* id는 HTML 속성에 그대로 들어가므로 [A-Za-z0-9_-]만 허용 */
-  const ci=x=>Object.assign({},x,{id:cid(x.id)});
-  const lectO={},attO={};
-  Object.entries(obj(s.lect)).forEach(([k,v])=>{const i=k.indexOf('|');lectO[i<0?k:k.slice(0,i+1)+cid(k.slice(i+1))]=Array.isArray(v)?v.map(x=>typeof x==='string'?cid(x):x):v;});
-  Object.entries(obj(s.att)).forEach(([k,v])=>{const i=k.indexOf('|');attO[i<0?k:k.slice(0,i+1)+cid(k.slice(i+1))]=v;});
+  const arr=v=>Array.isArray(v)?v:[],obj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{},hasId=x=>x&&okId(x.id);
+  const tracks=arr(s.tracks).filter(hasId).map(t=>({id:t.id,name:str(t.name),...(t.ex?{ex:true}:{})}));
+  const tid=v=>okId(v)&&tracks.some(t=>t.id===v)?v:'';
+  const lecturers=arr(s.lecturers).filter(hasId).map(x=>({id:x.id,name:str(x.name),subject:str(x.subject),phone:str(x.phone),memo:str(x.memo),...(x.ex?{ex:true}:{})}));
+  const kinds=arr(s.kinds).filter(hasId).map(k=>({id:k.id,name:str(k.name),noClass:!!k.noClass,color:HEX_RE.test(k.color)?k.color:KC[4]}));
+  const students=arr(s.students).filter(hasId).map(x=>({id:x.id,name:str(x.name),track:tid(x.track),no:str(x.no),admit:okDate(x.admit),complete:okDate(x.complete),commute:x.commute==='N'?'N':'Y',dorm:okDate(x.dorm),cnp:x.cnp==='Y'?'Y':'N',memo:str(x.memo),...(x.ex?{ex:true}:{})}));
+  const lect={};Object.entries(obj(s.lect)).forEach(([k,v])=>{const [d,t]=k.split('|');if(!DATE_RE.test(d)||!tid(t)||!Array.isArray(v))return;const a=Array.from({length:NP},(_,i)=>okId(v[i])?v[i]:'');if(a.some(Boolean))lect[k]=a;});
+  const sids=new Set(students.map(x=>x.id)),att={};
+  Object.entries(obj(s.att)).forEach(([k,v])=>{const [d,id]=k.split('|');if(!DATE_RE.test(d)||!sids.has(id)||!v||typeof v!=='object'||!ST.includes(v.s))return;const r={s:v.s};if(PART.includes(v.s))r.p=okPs(v.p);if(v.m)r.m=str(v.m);att[k]=r;});
   return {
-    tracks:arr(s.tracks).filter(t=>t&&t.id).map(t=>Object.assign({name:''},ci(t))),
-    students:arr(s.students).filter(x=>x&&x.id).map(x=>Object.assign({name:'',track:'',no:'',admit:'',complete:'',commute:'Y',dorm:'',cnp:'N',memo:''},ci(x),{track:cid(x.track)})),
-    lecturers:arr(s.lecturers).filter(x=>x&&x.id).map(x=>Object.assign({name:'',subject:'',phone:'',memo:''},ci(x))),
-    periods:arr(s.periods).length===NP?s.periods.map((p,i)=>({s:p&&p.s||DEF_P[i][0],e:p&&p.e||DEF_P[i][1]})):f.periods,
-    kinds:arr(s.kinds).filter(k=>k&&k.id).length?s.kinds.filter(k=>k&&k.id).map(ci):f.kinds,
-    offs:arr(s.offs).filter(o=>o&&o.from).map(o=>Object.assign({to:'',kind:'event',name:'',track:'',periods:[]},o,{id:cid(o.id),kind:cid(o.kind||'event'),track:cid(o.track)})),
-    lect:lectO,att:attO,disabledHol:arr(s.disabledHol),ex:!!s.ex
+    tracks,students,lecturers,
+    periods:arr(s.periods).length===NP?s.periods.map((p,i)=>({s:p&&TIME_RE.test(p.s)?p.s:DEF_P[i][0],e:p&&TIME_RE.test(p.e)?p.e:DEF_P[i][1]})):f.periods,
+    kinds:kinds.length?kinds:f.kinds,
+    offs:arr(s.offs).filter(o=>hasId(o)&&okDate(o.from)).map(o=>({id:o.id,from:o.from,to:okDate(o.to),kind:okId(o.kind)?o.kind:'event',name:str(o.name),track:tid(o.track),periods:okPs(o.periods),...(o.ex?{ex:true}:{})})),
+    lect,att,disabledHol:arr(s.disabledHol).filter(v=>typeof v==='string'&&DATE_RE.test(v)),ex:!!s.ex
   };
 }
 function loadA(){try{const r=localStorage.getItem(AKEY);if(r)return normA(JSON.parse(r));}catch(e){}return freshA();}
@@ -1358,7 +1363,7 @@ const au={mi:0,track:'',view:'month',wk:null,modal:null,tab:null,day:null,dayTra
   stat:{mode:'month',mi:0,from:AMIN,to:AMAX,track:'',upto:1},exp:{from:0,to:0,track:'',upto:1,sh:{daily:1,dsum:0,mstat:1,total:1,mrate:1,lcal:1,lhours:1,allow:1,roster:1}},
   stuF:'',opener:null};
 {const i=AM.findIndex(m=>TODAY.startsWith(ymOf(m)));au.mi=i>=0?i:(TODAY<AMIN?0:AM.length-1);au.stat.mi=au.mi;au.exp.from=au.mi;au.exp.to=au.mi;}
-function fixTrack(){if(au.track&&!A.tracks.find(t=>t.id===au.track))au.track='';if(!au.track&&A.tracks.length&&au.view==='week')au.track=A.tracks[0].id;}
+function fixTrack(){const gone=id=>id&&!A.tracks.some(t=>t.id===id);if(gone(au.track))au.track='';if(gone(au.stat.track))au.stat.track='';if(gone(au.exp.track))au.exp.track='';if(gone(au.stuF))au.stuF='';if(gone(au.dayTrack))au.dayTrack='';if(!au.track&&A.tracks.length&&au.view==='week')au.track=A.tracks[0].id;}
 
 /* ---------- schedule rules ---------- */
 const SC=new Map();
@@ -1411,10 +1416,11 @@ function statStu(s,a,b){
     const e=evalDay(s,k);if(!e)return;o.sd++;o.sp+=e.n;
     if(e.st==='유고결석')o.yu++;else if(e.st==='무단결석')o.mu++;
     else if(e.conv)o.conv++;
-    else if(e.st!=='출석'){o[{지각:'ji',조퇴:'jo',결과:'gy'}[e.st]]++;const m=k.slice(0,7);mp[m]=(mp[m]||0)+1;}
+    else if(e.st!=='출석'){o[{지각:'ji',조퇴:'jo',결과:'gy'}[e.st]]++;const m=k.slice(0,7);(mp[m]=mp[m]||[]).push(isDorm(s,k));}
     if(!e.abs){o.ap+=e.n-e.miss;if(isDorm(s,k))o.dd++;else o.cd++;}
   });
-  o.hw=Object.values(mp).reduce((t,v)=>t+Math.floor(v/3),0);
+  /* 환산결석 n일 = 그 달 마지막 지각·조퇴·결과 n일을 출석일에서 뺌 (그날의 통학·기숙 기준) */
+  Object.values(mp).forEach(days=>{const n=Math.floor(days.length/3);o.hw+=n;days.slice(days.length-n).forEach(d=>{if(d)o.dd--;else o.cd--;});});
   o.abs=o.yu+o.mu+o.conv+o.hw;o.att=Math.max(0,o.sd-o.abs);o.rate=o.sd?o.att/o.sd:null;
   return o;
 }
@@ -1630,6 +1636,7 @@ function closeAM(){au.modal=null;au.arm=null;au.sel.clear();$('aov').hidden=true
 const AFK=['data-a','data-v','data-sid','data-s','data-p','data-k','data-id','data-f','data-m'];
 function aKey(el){if(!el||el===document.body)return null;if(el.id)return '#'+CSS.escape(el.id);const s=AFK.filter(x=>el.hasAttribute(x)).map(x=>'['+x+'="'+CSS.escape(el.getAttribute(x))+'"]').join('');return s?el.tagName.toLowerCase()+s:null;}
 function renderAM(){
+  fixTrack();
   const md=$('amodal'),a=document.activeElement,key=md.contains(a)?aKey(a):null,ob=md.querySelector('.mb'),top=ob?ob.scrollTop:0,same=au.lastM===au.modal+'|'+au.tab;
   md.className='modal wide';
   md.innerHTML=({day:mDay,roster:mRoster,lects:mLects,days:mDays,stats:mStats,export:mExport,data:mData}[au.modal]||(()=>''))();
@@ -1802,7 +1809,7 @@ function mExport(){
 /* ---- 백업 ---- */
 function mData(){
   let h=headA('출석 데이터 · 백업')+'<div class="mb set"><div class="blk"><h3>백업</h3><p class="help">이 브라우저에만 저장됨 '+tip('행정 달력과 따로 저장돼요\n브라우저 기록을 지우면 사라질 수 있으니 가끔 백업하세요')+'</p><div class="form"><button class="btn pri" data-a="bk">백업 파일 저장 (.json)</button></div></div>';
-  h+='<div class="blk"><h3>불러오기</h3><p class="help">지금 출석 데이터를 덮어써요</p><div class="form"><input type="file" id="abk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="abk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기"></textarea><div class="form" style="margin-top:8px">'+(au.arm==='imp'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-a="armimp">불러오기</button>')+'</div><div class="err" id="abk-err"></div></div>';
+  h+='<div class="blk"><h3>불러오기</h3><p class="help">지금 출석 데이터를 덮어써요</p><div class="form"><input type="file" id="abk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="abk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기">'+esc(au.pendingImp||'')+'</textarea><div class="form" style="margin-top:8px">'+(au.arm==='imp'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-a="arm" data-v="imp">불러오기</button>')+'</div><div class="err" id="abk-err"></div></div>';
   h+='<div class="blk"><h3>정리</h3><div class="form">'+(A.ex?'<button class="btn" data-a="clearex">예시 데이터 지우기</button>':'<button class="btn" data-a="sample">예시 데이터 넣기</button>')+(au.arm==='reset'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="reset">모두 지우기 확인</button>':'<button class="btn danger" data-a="arm" data-v="reset">출석 데이터 모두 지우기</button>')+'</div></div>';
   return h+'</div>';
 }
@@ -2135,8 +2142,7 @@ document.addEventListener('click',e=>{
     case 'ap':{const key=au.day+'|'+t.dataset.sid,r=A.att[key];if(!r)break;const p=+t.dataset.p;r.p=(r.p||[]).includes(p)?r.p.filter(x=>x!==p):(r.p||[]).concat(p).sort((x,y)=>x-y);saveA();renderAM();renderA();break;}
     case 'allok':stuSorted(au.dayTrack).forEach(s=>{const key=au.day+'|'+s.id,r=A.att[key];if(r){if(r.m)A.att[key]={s:'출석',m:r.m};else delete A.att[key];}});saveA();renderAM();renderA();toast('모두 출석으로 바꿨어요');break;
     /* 학생부 */
-    case 'arm':au.arm=v;renderAM();break;
-    case 'armimp':{if(!$('abk-in').value.trim()){$('abk-err').textContent='백업 파일이나 내용 필요';break;}au.pendingImp=$('abk-in').value;au.arm='imp';renderAM();$('abk-in').value=au.pendingImp;break;}
+    case 'arm':if(v==='imp'){const ta=$('abk-in'),txt=ta?ta.value.trim():'';if(!txt){$('abk-err').textContent='백업 파일이나 내용 필요';break;}au.pendingImp=txt;}au.arm=v;renderAM();break;
     case 'disarm':au.arm=null;renderAM();break;
     case 'stuf':au.stuF=v;renderAM();break;
     case 'tadd':{const n=$('t-name').value.trim();if(!n)break;if(A.tracks.some(x=>x.name===n)){toast('이미 있는 직종');break;}A.tracks.push({id:uid(),name:n});saveA();renderAM();renderA();const f=$('t-name');f&&f.focus();break;}
@@ -2166,7 +2172,7 @@ document.addEventListener('click',e=>{
     case 'exgo':doExport();break;
     /* 백업 */
     case 'bk':download('출석백업_'+TODAY+'.json',new Blob([JSON.stringify(A,null,1)],{type:'application/json'}));break;
-    case 'imp':{try{const s=JSON.parse(au.pendingImp||$('abk-in').value||'');if(!s||!Array.isArray(s.students))throw 0;A=normA(s);saveA();au.arm=null;au.track='';renderAM();renderA();toast('불러왔어요 · 학생 '+A.students.length+'명');}catch(err){au.arm=null;renderAM();$('abk-err').textContent='출석 백업 형식이 아니에요';}break;}
+    case 'imp':{try{const s=JSON.parse($('abk-in').value||au.pendingImp||'');if(!s||!Array.isArray(s.students))throw 0;A=normA(s);saveA();au.arm=null;au.pendingImp=null;au.track='';renderAM();renderA();toast('불러왔어요 · 학생 '+A.students.length+'명');}catch(err){au.arm=null;renderAM();$('abk-err').textContent='출석 백업 형식이 아니에요';}break;}
     case 'reset':A=freshA();au.arm=null;au.track='';saveA();renderAM();renderA();toast('출석 데이터를 지웠어요');break;
   }
 });
@@ -2185,9 +2191,11 @@ function dragTo(c){
   drag.root.querySelectorAll('[data-pc]').forEach(x=>{const di=+x.dataset.di,p=+x.dataset.p;if(di>=d0&&di<=d1&&p>=p0&&p<=p1)au.sel.add(x.dataset.k+'|'+p);});
   paintSel();
 }
-document.addEventListener('pointermove',e=>{if(!drag)return;const el=document.elementFromPoint(e.clientX,e.clientY),c=el&&el.closest&&el.closest('[data-pc]');if(c&&drag.root.contains(c)){if(c!==drag.start)drag.moved=true;dragTo(c);}});
-document.addEventListener('pointerup',()=>{if(!drag)return;if(!drag.moved&&drag.toggle){au.sel.delete(drag.start.dataset.k+'|'+drag.start.dataset.p);paintSel();}drag=null;renderActBar();});
-document.addEventListener('pointercancel',()=>{if(!drag)return;au.sel=drag.orig;drag=null;paintSel();renderActBar();});
+function endDrag(restore){if(!drag)return;if(restore)au.sel=drag.orig;drag=null;paintSel();renderActBar();}
+addEventListener('blur',()=>endDrag(true));
+document.addEventListener('pointermove',e=>{if(!drag)return;if(e.pointerType==='mouse'&&!(e.buttons&1)){endDrag(false);return;}const el=document.elementFromPoint(e.clientX,e.clientY),c=el&&el.closest&&el.closest('[data-pc]');if(c&&drag.root.contains(c)){if(c!==drag.start)drag.moved=true;dragTo(c);}});
+document.addEventListener('pointerup',()=>{if(!drag)return;if(!drag.moved&&drag.toggle){au.sel.delete(drag.start.dataset.k+'|'+drag.start.dataset.p);}endDrag(false);});
+document.addEventListener('pointercancel',()=>endDrag(true));
 
 $('amodal').addEventListener('input',e=>{
   const t=e.target;
