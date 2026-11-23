@@ -145,7 +145,30 @@ Dark canvas; uppercase English month; `MON–FRI` header; hairline dashed grid (
 - Added a second line weight (2px stitch) and Bark-filled selected state; both stay within the reference's "nothing thicker than 2px / Bark is the one elevated solid" limits.
 - Photos were tried and removed (not part of the system).
 
-## 12. Changelog
+## 12. Attendance calendar (출석 달력)
+
+Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own storage key `attend-cal-v1`. The rail's **행정 / 출석** radio pair switches modes (remembered in `cal-mode`; `?mode=att` opens it directly). Admin handlers return early while `body[data-mode=att]`.
+
+**Range** 2026.12 – 2027.12 (the admin calendar now runs 2026.11 – 2027.12). Legal holidays live once in `window.KR_HOLIDAYS`; each calendar keeps its own on/off list.
+
+**Rules**
+- 훈련소정일수 = weekday, not a holiday, not covered by a "수업 없음" 특이사항, within the student's 입학–수료 dates. 6 periods/day (45 min, lunch 12–13), editable times.
+- 특이사항 = {from, to?, kind, name, track | all, periods[] | whole day}. Kinds are user-managed; `noClass` decides whether they remove class days/periods (방학·개별학습·자체 휴업일 on, 행사·특강 off).
+- Attendance is recorded **per day** (default 출석, no row stored). 지각·조퇴·결과 store the missed periods. If attended periods < 50% of that day's periods → the day counts as 결석 ("50%미만 결석").
+- 지각+조퇴+결과 (non-converted) 3 → 결석 1일, computed **per calendar month**, summed for longer ranges.
+- 출석일 = 소정일 − (유고 + 무단 + 50%미만 + 환산). Rates < 80% use `--c4`.
+- 통학/기숙 per day: 기숙사 입소일 set → 기숙 from that date; otherwise 통학 = N means 기숙 for the whole period. 취성패 Y → 훈련참여수당 0원 (export note).
+- Analysis and export count only up to today by default ("오늘까지만"), so future default-출석 days don't inflate rates. Lecturer hours include planned periods.
+
+**Views** month (per 직종 or 전체) · 주 시간표 (drag a rectangle of period cells, Ctrl+click to add; action bar assigns/clears 외부강사 or 특이사항) · day modal (period grid with the same drag selection + per-student status pills).
+
+**Colors** absence badges `--c4`, partial `--c2`, "출석 n" dot `--c1`; class-less cells Bark 18–22%; holidays keep the ember rule. Selected period cell = Bark fill + 1px cream outline (same as other selected controls).
+
+**xlsx** written in-page (STORE zip + SpreadsheetML, inline strings, fixed style table) — no library, works offline. Sheets: 일별 교시 출결표 (per month, lecturer row per 직종), 일별 요약, 월별 통계, 누적 통계, 월별 출석률, 외부강사 달력 (per month + 강사별 시수), 강사 월별 시수, 수당 기초자료, 학생부·강사 명단·수업일 명부. Verify with `node tools/verify-attendance.js <dir>`.
+
+## 13. Changelog
+
+**v11 (출석 달력)** — 행정/출석 mode switch; 2027.12 range + 2027 H2 holidays; attendance module (학생부·직종·외부강사·수업일 명부·교시 시간), month/week/day views with drag period selection, 50%/3회 rules, analysis modal, offline xlsx export, JSON backup; rail month list tightened to fit 14 months.
 
 **v10 (review follow-up)** — one commit per item on `feat/review-fixes`:
 1. Detail panel is a grid column at ≥1280px (calendar reflows; THU/FRI and today stay visible); edge is now a 2px stitch.
