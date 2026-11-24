@@ -167,7 +167,7 @@ const ok = (c, m) => { console.log((c ? '  ✓ ' : '  ✗ ') + m); if (!c) fails
   await page.press('#day-add', 'Enter'); await page.waitForTimeout(100);
   ok((await items()).some(i => i.title === '다른날' && i.start === '2026-12-10' && i.due === '2026-12-11'), '일 모달 범위 저장');
   await page.keyboard.press('Escape');
-  await page.click('.chip >> text=연말 정산'); await page.waitForSelector('#d-start');
+  await page.click('.rb:has-text("연말 정산") >> nth=0'); await page.waitForSelector('#d-start');
   ok(await page.inputValue('#d-start') === '2026-12-03' && /12\/3/.test(await page.textContent('#d-meta')), '상세에 시작일 표시: ' + await page.textContent('#d-meta'));
   await page.fill('#d-start', '2026-12-30');
   ok(/늦어요/.test(await page.textContent('#d-warn')), '상세 start>due 경고');
