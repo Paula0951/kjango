@@ -122,6 +122,8 @@ input[type=checkbox]{accent-color:var(--fg)}
 .chip.high .late{color:var(--high-fg);font-weight:700;border-left:1px solid color-mix(in srgb,var(--high-fg) 40%,transparent);padding-left:6px;margin-left:2px}
 .chip.overdue .hl{display:none}
 .cell.hasmore .lab.tdy{display:none}
+.cell .ch{container-type:inline-size}
+@container (max-width:120px){.lab.tdy{display:none}}
 .chip .hl{width:11px;height:11px;flex-shrink:0;opacity:.65}
 /* 클립 버튼은 칸/칩에 마우스·포커스가 있을 때만 (키보드 Tab으로는 항상 도달) */
 .chipw .clip{position:absolute;right:0;top:50%;transform:translateY(-50%);width:24px;height:24px;background:var(--surface);border-color:var(--strong);color:var(--fg);opacity:0;z-index:1}
@@ -913,8 +915,8 @@ function cellHTML(d,inMonth,compact){
   let h='<div class="'+cls.join(' ')+'" data-act="day" data-day="'+k+'" role="button" tabindex="'+(compact?-1:(k===(ui.fk||(inMonth&&k===TODAY?k:''))?0:-1))+'" aria-label="'+fmtD(k)+(k===TODAY?' 오늘':'')+(info.hol?' '+esc(info.hol):'')+' 항목 '+(list.length+rg.n)+'개"'+(k===TODAY?' aria-current="date"':'')+st+'>';
   h+='<div class="ch"><span class="dnum">'+(d.getDate()===1||(!inMonth&&compact)?(d.getMonth()+1)+'/':'')+d.getDate()+'</span>';
   if(k===TODAY&&!compact)h+='<span class="lab tdy">TODAY</span>';
-  if(info.hol)h+='<span class="lab h">'+esc(info.hol)+'</span>';
-  info.customs.forEach(c=>{h+='<span class="lab" style="color:'+esc(c.color)+';font-weight:700">'+esc(c.name)+'</span>';});
+  if(info.hol)h+='<span class="lab h" title="'+esc(info.hol)+'">'+esc(info.hol)+'</span>';
+  info.customs.forEach(c=>{h+='<span class="lab" title="'+esc(c.name)+'" style="color:'+esc(c.color)+';font-weight:700">'+esc(c.name)+'</span>';});
   if(!compact)h+='<button class="add" data-act="add" data-day="'+k+'" aria-label="'+fmtD(k)+'에 추가"><svg class="i" style="width:14px;height:14px"><use href="#i-plus"/></svg></button>';
   h+='</div>';
   h+=rg.h;
@@ -1354,11 +1356,11 @@ function synCollect(){
   document.querySelectorAll('[data-syn-in]').forEach(x=>{inn[x.dataset.synIn]=x.checked?1:0;});
   return {d:g('d').value,p:g('p').value,hi:list('hi'),lo:list('lo'),mid:list('mid'),fmt:g('fmt').value,inn:inn};
 }
-function synValidate(apply){
+function synValidate(apply,keepModal){
   const cand=synCollect(),err=synCheck(cand),e=$('syn-err');
   if(e)e.textContent=err;
   document.querySelectorAll('[data-syn]').forEach(x=>x.classList.toggle('bad',!!err&&['d','p'].includes(x.dataset.syn)&&/기호|전용|같아요/.test(err)||!!err&&['hi','lo','mid'].includes(x.dataset.syn)&&!/기호|전용|같아요|형식|날짜/.test(err)));
-  if(apply&&!err){S.syn=cand;save();applySyn();setTimeout(renderModal,0);renderMain();renderSide();qaRefresh(document.activeElement===$('qa'));paintMir($('qa'));}
+  if(apply&&!err){S.syn=cand;save();applySyn();if(!keepModal)setTimeout(renderModal,0);renderMain();renderSide();qaRefresh(document.activeElement===$('qa'));paintMir($('qa'));}
   return err;
 }
 function renameTag(a,b){
@@ -1975,7 +1977,7 @@ $('modal').addEventListener('input',e=>{
     if($('cp-err')&&$('cp-err').textContent)$('cp-err').textContent='';
     return;}
   if(t.id==='day-add'){setHint($('day-err'),hintFor(t.value,true,ui.selDay,'day-add'));return;}
-  if(t.dataset.syn||t.dataset.synIn!=null){synValidate(false);return;}
+  if(t.dataset.syn||t.dataset.synIn!=null){synValidate(true,true);return;}
   if(t.dataset.kw){S.kw=S.kw||{};S.kw[t.dataset.kw]=t.value.split(/[,，]/).map(x=>x.trim()).filter(Boolean);save();soon();return;}
   if(t.dataset.trn!=null)return;
   if(t.dataset.cn){const c=S.customs.find(q=>q.id===t.dataset.cn);if(c){c.name=t.value;delete c.ex;}}

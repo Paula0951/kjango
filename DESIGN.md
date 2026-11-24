@@ -207,6 +207,8 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
    - **Drag-select:** press and drag on empty grid cells (or Shift+arrows, then Enter) to open the composer with that range. The composer has a weekday mini calendar for range picking.
 8. **Chip density:** `D+n` sits inside the chip, and the attachment button appears only on hover or focus.
 
+9. **Small fixes:** the `TODAY` word hides when the cell header is under 120px (the circled number already marks today, so it no longer shows as `T…` beside the detail panel). Holiday and custom-day labels carry a `title` for when they are cut off. Settings › 입력 symbols apply as you type, without needing to leave the field.
+
 Tests: `tools/verify-{,quickadd-,ranges-,tokens-,settings-}*.js` (see each file header).
 
 **v12 (on-device feedback)**
