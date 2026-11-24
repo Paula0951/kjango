@@ -111,16 +111,18 @@ Never thicker than 2px; never solid; never a shadow. The wallpaper mirrors this:
 - **Inputs**: underline only (1px cream). Focus → dashed underline.
 - **Drawers**: filter (left of content, next to rail) and item detail (right, Slack-like). Stitch edges (`2px dashed --strong`). At ≥1280px the detail panel is a third grid column (`clamp(340px,24vw,440px)`) so the calendar reflows instead of being covered; below that it overlays.
 - **Modals**: day / all-months / settings (tabs). 2px dashed border.
-- **Token buttons** `# @ !` + calendar icon: 28px dashed-outline circles that insert syntax into the quick-add field. The date token inserts the next weekday (`내일` when that is a weekday, else `M/D`) and advances one weekday per click.
-- **Drop targets**: while dragging a file, the cell / detail panel / day modal under the pointer shows a centered `여기에 놓기` pill (bg fill, 1px dashed cream).
+- **Token buttons** `# @ !` + calendar icon (+ `⤢` 자세히 + send): 28px dashed-outline circles that insert syntax into the quick-add field. The date token inserts the next weekday as `/MM-DD` and advances one weekday per click (a range is typed by hand: `/11-12~12-25`).
+- **Token highlight (`.qin` + `.mir`)**: the quick-add and day-modal inputs have transparent text over a same-font mirror layer (same box, padding and font; tokens get no horizontal padding, so the caret never drifts). Recognized tokens become pills: tag = its category color (16% fill + 60% outline), assignee = dashed outline, priority high = the urgent cream pill / low = muted dashed, date = Bark fill + stitch outline, invalid date = `--over` dashed. The hint line (`#qa-hint`) shows the same kinds as chips (`.hc`), plus dashed suggestion chips for existing `#`/`@` words while typing one.
+- **Composer (modal `compose`)**: 항목 추가 popup for details. Opens by dropping files on the quick-add bar, the `⤢` button, or Shift+Enter in the bar (typed text is parsed into fields). Fields: title, 시작일/기한, tag chips (+ suggestions), assignee chips, 중요도 segmented, memo, document links. Enter in title or Ctrl+Enter saves, Esc cancels (bar text is kept). Several files become one item with all links; `파일별로` saves one item per file.
+- **Drop targets**: while dragging a file, the cell / detail panel / day modal / quick-add bar / composer under the pointer shows a centered `여기에 놓기` pill (bg fill, 1px dashed cream).
 - **Info icon `.ti`**: 22px circle `ⓘ` (32px hit area); hover/focus shows a Bark tooltip (`white-space: pre-line`, 12.5px) rendered as a real `role=tooltip` element. `.r` variant anchors right to avoid clipping at panel/modal edges.
 
 ## 7. Text-input & copy rules (anti-wordiness)
 
 1. **Placeholder = a noun, ≤ 4 words.** `항목 추가` · `검색` · `메모` · `하위 항목` · `경로 또는 링크`.
-2. **Syntax is taught by icons, not sentences.** Quick-add shows `#` `@` `!` token buttons and one `ⓘ`.
+2. **Syntax is taught by icons, not sentences.** Quick-add shows `#` `@` `!` token buttons and one `ⓘ`. Dates: `/11-20`, `/11-12~12-25`, `/2026-11-12` (year omitted = this year, but before the calendar range = next year; end before start = error); older `11/20 · 20일 · 내일` still work.
 3. **Details go in the tooltip**, one idea per line (date formats, #/@/!, document paste/drag, preview-page limitation).
-4. **Hint line under quick-add appears on focus** with the default target (`→ 11월 13일 (금) · @나`), then shows only the parse result while typing (`→ 11/20(금) · #보고 · @나 · 중요도 높음`); empty again on blur.
+4. **Hint line under quick-add appears on focus** with the default target (`→ 11월 13일 (금) · @나`), then shows only the parse result as chips while typing (`→ [11/20(금)] [#보고] [@나] [중요도 높음]`); empty again on blur.
 5. **Empty states ≤ 2 words** (`항목 없음`, `마감 없음`, `분류 없음 ⓘ`). Banners one line (`예시 15개  지우기`). Toasts are one short clause (`경로 복사됨 · Win+R에 붙여넣기`).
 6. Settings `p.help` ≤ one short phrase + `ⓘ` when more is needed. No paragraph-length helper text in the main flow.
 
