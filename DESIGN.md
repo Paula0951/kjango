@@ -171,6 +171,15 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
 
 ## 13. Changelog
 
+**v12 (on-device feedback)**
+1. **Month arrows beside the title** (`‹ NOVEMBER › [오늘]`), in both the admin and attendance calendars. A control sits next to the thing it changes.
+2. **Proportions:** the hero is one compact band, and the 예시/필터 notices moved into the sub line. The grid fills the viewport with equal `1fr` rows, and no page scroll is forced on load. `fitChips()` shows as many chips as fit the cell height, and `+N개 더` moves next to the day number so it doesn't take up a chip row. Setting `previewCap` (default 자동). NEXT UP is below the fold, reached via the rail link `다가오는 마감`. The urgent pill can use the full cell width.
+3. **Quick-add:**
+   - Inline tokens (`#` `@` `!` `/date`) are highlighted as pills inside the input, using a mirror layer.
+   - The hint line shows the parse result as chips.
+   - New `/` date syntax: `/2026-11-12`, `/11-12`, `/11-12~12-25` (a range sets `start` and `due`).
+   - Dropping files on the bar, the `⤢` button, or Shift+Enter opens a composer popup (title, 시작일/기한, tag and assignee chips with suggestions, 중요도, 메모, links). Verify with `node tools/verify-quickadd.js <dir>`.
+
 **v11 (출석 달력)** — 행정/출석 mode switch; 2027.12 range + 2027 H2 holidays; attendance module (학생부·직종·외부강사·수업일 명부·교시 시간), month/week/day views with drag period selection, 50%/3회 rules, analysis modal, offline xlsx export, JSON backup; rail month list tightened to fit 14 months.
 
 **v10 (review follow-up)** — one commit per item on `feat/review-fixes`:

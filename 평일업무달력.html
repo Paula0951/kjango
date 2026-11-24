@@ -119,6 +119,7 @@ input[type=checkbox]{accent-color:var(--fg)}
 .stat .over b{color:var(--over)}
 .badge.late{border-color:var(--over);color:var(--over)}
 .more{font-size:12px;line-height:1.3;letter-spacing:.04em;color:var(--muted);text-align:left;padding:1px 0}
+.ch .more{margin-left:auto;padding:2px 8px;border:1px dashed var(--strong);border-radius:999px;white-space:nowrap}.ch .more:hover{color:var(--fg);border-color:var(--fg)}.ch .more~.add{margin-left:0}
 .more:hover{color:var(--fg);text-decoration:underline;text-decoration-style:dashed;text-underline-offset:4px}
 .clip{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
 .clip:hover{border-color:var(--fg);color:var(--fg)}
@@ -749,7 +750,7 @@ function fitChips(){
     let n=chips.length;
     if(n>lim){n=lim;}
     const apply=()=>{chips.forEach((x,i)=>x.hidden=i>=n);const o=c.querySelector('.more');if(o)o.remove();
-      if(n<chips.length){const b=document.createElement('button');b.className='more';b.dataset.act='day';b.dataset.day=c.dataset.day;b.textContent='+'+(chips.length-n)+'개 더';c.appendChild(b);}};
+      if(n<chips.length){const b=document.createElement('button');b.className='more';b.dataset.act='day';b.dataset.day=c.dataset.day;b.textContent='+'+(chips.length-n)+'개 더';b.setAttribute('aria-label',fmtD(c.dataset.day)+' 항목 '+chips.length+'개 모두 보기');const ch=c.querySelector('.ch');if(ch&&!mob)ch.insertBefore(b,ch.querySelector('.add'));else c.appendChild(b);}};
     apply();
     if(!mob)while(n>1&&c.scrollHeight>c.clientHeight+1){n--;apply();}
   });

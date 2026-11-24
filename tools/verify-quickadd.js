@@ -158,7 +158,7 @@ const ok = (c, m) => { console.log((c ? '  ✓ ' : '  ✗ ') + m); if (!c) fails
   await page.click('[data-act=insd]'); const v1 = await page.inputValue('#qa'); await page.click('[data-act=insd]'); const v2 = await page.inputValue('#qa');
   ok(v1 === '/11-25' && v2 === '/11-26', '날짜 버튼: ' + v1 + ' → ' + v2);
   await page.fill('#qa', '');
-  await page.click('.cell[data-day="2026-12-08"]');
+  await page.click('.cell[data-day="2026-12-08"]', { position: { x: 12, y: 12 } });
   await page.waitForSelector('#day-add');
   await page.fill('#day-add', '다른날 /12-10~12-11 #x @y !높음');
   const dmir = await page.evaluate(() => [...document.querySelectorAll('#modal .mir .tk')].length);
