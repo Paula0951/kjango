@@ -49,7 +49,17 @@ Each dimension uses its own channel: **priority = fill/weight**, **status = glyp
 | `--c4` | `#e08fb6` | 로즈 |
 | `--c0` | `#cdb79a` | 샌드 (no tag) |
 
-A tag's color is auto-picked from its name, and can be changed by clicking its dot in the filter drawer (stored in `S.tagColors`). Color is never the only cue: tag text, status glyph and priority pill carry the same information. The wallpaper draws the same hexes.
+A tag's color is auto-picked from its name, and can be changed by clicking its dot in the filter drawer or in Settings › 태그 (stored in `S.tagColors`). Color is never the only cue: tag text, status glyph and priority pill carry the same information. The wallpaper draws the same hexes.
+
+**Tag weight (value, not kind).** Hue says *which* tag; weight says *how much it matters*. Palette stays at 4 hues + neutral (more hues would fail the deuteranopia/tritanopia distinctness and AA rules); the extra dimension is shape:
+
+| Weight | Treatment (chips) | Cell dot | Default for names containing |
+|---|---|---|---|
+| 강조 | 26% tag-color fill + solid full-color outline + bold | filled dot with a 1.5px ring | 제출 마감 보고 본부 긴급 중요 필수 결재 감사 기한 독촉 승인 필독 |
+| 보통 | outline only (62% tag color) | filled dot | everything else |
+| 참고 | dashed outline, `--muted` text | hollow dot | 참고 참조 메모 공유 공지 안내 열람 |
+
+Weights are inferred from the keyword lists (Settings › 태그 › 자동 기준 말, `S.kw`) and overridden per tag (`S.tagWeights`; filter drawer pill cycles 강조→보통→참고, Settings shows 자동 vs 직접 지정 with a reset). Inside the input mirror the bold is dropped (caret alignment) — fill + solid outline carry it. Cell dots come from `tagDot(item)` (primary tag = first strong, else first non-reference).
 
 Custom date colors and user presets (월넛·그래파이트·포레스트·미드나이트) override these via `STYLE_VARS`.
 
@@ -69,7 +79,9 @@ Date markers (never a cream fill, so they can't be confused with urgent pills):
 - **Today** — 2px dashed cream frame around the whole cell + 2px ring on the (bold) day number + 11px `TODAY` + `#2a1a0c` tint + the weekday header (e.g. FRI 금) underlined. Earlier days of the month are dimmed (`past`: number `--strong`, chips 78%) so today is the brightest place on the screen.
 - **Holiday** — ember day number + ember label + `--hol-bg` cell.
 - **Custom day** — user color label (optional full-cell tint). New days default to `--c3`.
-- **Overdue** (not done, due < today) — `D+n` label in `--over` beside the chip, never dimmed by `past`; `지연 D+n` badge in the day modal; hero stat `지연 N` (all months, number in `--over`). Text always accompanies the color.
+- **Overdue** (a *task* that is not done, due < today — `needsDone(i)`; 일정·참고 items never go overdue) — `D+n` label in `--over` beside the chip, never dimmed by `past`; `지연 D+n` badge in the day modal; hero stat `지연 N` (all months, number in `--over`). Text always accompanies the color.
+
+**Completion model.** `needsDone(i)`: explicit `item.kind` (`task` | `event`) wins; otherwise the item's tags decide (`S.tagDone` on/off per tag, else 일정 keywords such as 회의·행사·휴가·참고 → event; no tag = task). Tasks get a real checkbox (`.cb`, `role=checkbox`, 20px + 3px hit pad) in day-modal and NEXT UP rows; events get a neutral `◇` and a 일정 badge, never `D+n`, never in the 지연 stat. Done keeps §3 level 3 (muted + strike; the checked box replaces the `✓` prefix on task rows).
 
 Selected controls (filter row `.sbtn.on`, segmented buttons `.seg .on`) use **Bark fill + 1px cream border** (+ `✓` on segments) — a selected control must not look like an urgent item.
 
@@ -116,8 +128,8 @@ Never thicker than 2px; never solid; never a shadow. The wallpaper mirrors this:
 - **Drawers**: filter (left of content, next to rail) and item detail (right, Slack-like). Stitch edges (`2px dashed --strong`). At ≥1280px the detail panel is a third grid column (`clamp(340px,24vw,440px)`) so the calendar reflows instead of being covered; below that it overlays.
 - **Modals**: day / all-months / settings (tabs). 2px dashed border.
 - **Token buttons** `# @ !` + calendar icon (+ `⤢` 자세히 + send): 28px dashed-outline circles that insert syntax into the quick-add field. The date token inserts the next weekday as `/MM-DD` and advances one weekday per click (a range is typed by hand: `/11-12~12-25`).
-- **Token highlight (`.qin` + `.mir`)**: the quick-add and day-modal inputs have transparent text over a same-font mirror layer (same box, padding and font; tokens get no horizontal padding, so the caret never drifts). Recognized tokens become pills: tag = its category color (16% fill + 60% outline), assignee = dashed outline, priority high = the urgent cream pill / low = muted dashed, date = Bark fill + stitch outline, invalid date = `--over` dashed. The hint line (`#qa-hint`) shows the same kinds as chips (`.hc`), plus dashed suggestion chips for existing `#`/`@` words while typing one.
-- **Composer (modal `compose`)**: 항목 추가 popup for details. Opens by dropping files on the quick-add bar, the `⤢` button, or Shift+Enter in the bar (typed text is parsed into fields). Fields: title, 시작일/기한, tag chips (+ suggestions), assignee chips, 중요도 segmented, memo, document links. Enter in title or Ctrl+Enter saves, Esc cancels (bar text is kept). Several files become one item with all links; `파일별로` saves one item per file.
+- **Token highlight (`.qin` + `.mir`)**: the quick-add and day-modal inputs have transparent text over a same-font mirror layer (same box, padding and font; tokens get no horizontal padding or weight change, so the caret never drifts). Kind is told by the prefix (`#` `@` `!` `/`), value by shape: tag by weight (see §2), assignee `@나` = Bark fill + solid outline, others dashed; priority high = the urgent cream pill (bare `!` counts, see §7) / low = muted dashed; date by proximity to today — overdue `--over` dashed (hint chip adds `D+n`), today/tomorrow/in-range Bark + cream outline (+ `오늘`/`내일`/`진행`), within 7 days solid stitch, later muted dashed; invalid date = `--over` dashed + wavy underline. The `!` token button toggles high (inserts `! ` at the start, `aria-pressed` + Bark when on). The hint line (`#qa-hint`) shows the same kinds as chips (`.hc`), plus dashed suggestion chips for existing `#`/`@` words while typing one.
+- **Composer (modal `compose`)**: 항목 추가 popup for details. Opens by dropping files on the quick-add bar, the `⤢` button, or Shift+Enter in the bar (typed text is parsed into fields). Fields: title, 시작일/기한 (+ an inline Mon–Fri month calendar: drag a range, click = one day, Shift+click extends, arrows/Space/Enter/Shift+arrows/PageUp·Down by keyboard; kept in sync with the date fields), tag chips (+ suggestions), assignee chips, 중요도 segmented, 완료 체크 segmented (자동 · 필요 · 일정·참고), memo, document links. Entry point `openComposer({title,start,due,tags,who,pr,kind,memo,links,text})`. The detail panel uses the same chip editor (`edHTML('d',…)`): space becomes `_`, Enter/comma commits, Backspace on empty removes the last chip, × removes, focus-out commits. Enter in title or Ctrl+Enter saves, Esc cancels (bar text is kept). Several files become one item with all links; `파일별로` saves one item per file.
 - **Drop targets**: while dragging a file, the cell / detail panel / day modal / quick-add bar / composer under the pointer shows a centered `여기에 놓기` pill (bg fill, 1px dashed cream).
 - **Info icon `.ti`**: 22px circle `ⓘ` (32px hit area); hover/focus shows a Bark tooltip (`white-space: pre-line`, 12.5px) rendered as a real `role=tooltip` element. `.r` variant anchors right to avoid clipping at panel/modal edges.
 
@@ -127,8 +139,10 @@ Never thicker than 2px; never solid; never a shadow. The wallpaper mirrors this:
 2. **Syntax is taught by icons, not sentences.** Quick-add shows `#` `@` `!` token buttons and one `ⓘ`. Dates: `/11-20`, `/11-12~12-25`, `/2026-11-12` (year omitted = this year, but before the calendar range = next year; end before start = error); older `11/20 · 20일 · 내일` still work.
 3. **Details go in the tooltip**, one idea per line (date formats, #/@/!, document paste/drag, preview-page limitation).
 4. **Hint line under quick-add appears on focus** with the default target (`→ 11월 13일 (금) · @나`), then shows only the parse result as chips while typing (`→ [11/20(금)] [#보고] [@나] [중요도 높음]`); empty again on blur.
-5. **Empty states ≤ 2 words** (`항목 없음`, `마감 없음`, `분류 없음 ⓘ`). Banners one line (`예시 15개  지우기`). Toasts are one short clause (`경로 복사됨 · Win+R에 붙여넣기`).
-6. Settings `p.help` ≤ one short phrase + `ⓘ` when more is needed. No paragraph-length helper text in the main flow.
+5. **Syntax is configurable, `#` `@` are not.** Settings › 입력 sets the date symbol (default `/`), priority symbol (`!`), high/low/normal words, accepted date formats (연-월-일, 월-일, 월 일, 일, 오늘·내일·모레, 요일 after the symbol: `/금`, `/다음주금`) and the date display format. Symbols are one character, may not be `#`/`@`, letters/digits/`~ . - _ ,`, or equal each other; invalid input shows an inline error and is not applied. Tags/assignees end at whitespace — use `_` for several words (`#본부_제출`); typing a space in a chip input inserts `_`.
+5b. **Bare `!` = high.** A standalone `!`/`!!` anywhere, or a `!` glued to the very start (`!교육 증명서`, the `!` is stripped), means high; `!높음 !중요 !high !낮음 !low !보통` keep working; `와!` mid-title stays text.
+6. **Empty states ≤ 2 words** (`항목 없음`, `마감 없음`, `분류 없음 ⓘ`). Banners one line (`예시 15개  지우기`). Toasts are one short clause (`경로 복사됨 · Win+R에 붙여넣기`).
+7. Settings `p.help` ≤ one short phrase + `ⓘ` when more is needed. No paragraph-length helper text in the main flow.
 
 ## 8. Ember rules
 
@@ -174,6 +188,26 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
 **xlsx** written in-page (STORE zip + SpreadsheetML, inline strings, fixed style table) — no library, works offline. Sheets: 일별 교시 출결표 (per month, lecturer row per 직종), 일별 요약, 월별 통계, 누적 통계, 월별 출석률, 외부강사 달력 (per month + 강사별 시수), 강사 월별 시수, 수당 기초자료, 학생부·강사 명단·수업일 명부. Verify with `node tools/verify-attendance.js <dir>` and `node tools/verify-attendance-fixes.js`.
 
 ## 13. Changelog
+
+**v13 (tags · completion · ranges)**
+1. **Bare `!` means high priority.** `! 교육 증명서 제출` and `!교육…` at the start of the text both set high. A `!` glued to a word mid-title stays plain text. The `!` button toggles a leading `! `.
+2. **Tags have no spaces.** Use `_` for multi-word tags. In chip editors (composer and detail), typing a space inserts `_`, and Enter or a comma commits the tag.
+3. **Values look different, not just kinds:**
+   - **Tag weight:** 강조 (tinted fill, solid outline, bold), 보통 (outline) and 참고 (dashed, muted), on top of the tag color. Defaults come from keyword lists and can be overridden in Settings › 태그.
+   - **People:** `@나` is filled; other people are dashed.
+   - **Dates:** shown by proximity (지남 / 오늘·내일 / 이번 주 / 이후).
+   - **Calendar cells:** the checkbox ring or dash shows the tag weight.
+4. **Settings › 태그** has per-tag color, weight, 완료 체크, rename (renaming to an existing tag merges) and delete, plus editable keyword lists.
+5. **Settings › 입력** has the date and priority symbols, the priority words, the accepted date formats (incl. `/금`, `/다음주금`) and the display format. `#` and `@` are reserved and cannot be reassigned.
+6. **Completion:** each item has `kind` task|event, decided by `needsDone()` (explicit kind → tag setting → 일정 keywords).
+   - **Tasks:** show a checkbox on cells, range bars, day-modal and NEXT UP rows.
+   - **Events:** have no checkbox and are never overdue or counted as 지연.
+7. **Ranges:**
+   - **On the grid:** `start~due` items draw as per-week lane bars across the grid, with ◂/▸ continuation, an end cap and `D+n`. They also appear in the day modal, the all-months modal and the wallpaper.
+   - **Drag-select:** press and drag on empty grid cells (or Shift+arrows, then Enter) to open the composer with that range. The composer has a weekday mini calendar for range picking.
+8. **Chip density:** `D+n` sits inside the chip, and the attachment button appears only on hover or focus.
+
+Tests: `tools/verify-{,quickadd-,ranges-,tokens-,settings-}*.js` (see each file header).
 
 **v12 (on-device feedback)**
 1. **Month arrows beside the title** (`‹ NOVEMBER › [오늘]`), in both the admin and attendance calendars. A control sits next to the thing it changes.
