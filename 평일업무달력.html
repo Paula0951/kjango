@@ -411,6 +411,7 @@ select.fi{background:var(--bg)}
 .lrow{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px dashed var(--line);font-size:14px}
 .lrow .d{font-variant-numeric:tabular-nums;color:var(--muted);width:130px;flex-shrink:0;font-size:13px}
 .lrow .nm{flex:1;min-width:0}
+.fxr{flex-wrap:wrap;gap:8px 12px}.fxr .fi{width:auto}.fxr .nm{flex:1 1 150px;width:auto}
 .srow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px dashed var(--line)}
 input[type=color]{width:44px;height:28px;border:1px solid var(--faint);border-radius:0;padding:0;background:none}
 .sw{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:2px;border:1px solid var(--faint)}
@@ -699,15 +700,94 @@ const HOLIDAYS=window.KR_HOLIDAYS={
  '2027-12-25':'성탄절','2027-12-27':'대체공휴일(성탄절)',
  '2028-01-01':'신정'
 };
-/* 2027 확정 일정 (FIXED-2027.md 와 같이 고침) · 두 달력이 같이 씀 */
-const FIXED=window.KR_FIXED=[
- {id:'fx-win26',from:'2026-12-21',to:'2027-01-08',kind:'vac',name:'동계 방학',note:'바뀔 수 있음'},
- {id:'fx-sum27',from:'2027-07-19',to:'2027-08-20',kind:'vac',name:'하계 방학',note:'바뀔 수 있음'},
- {id:'fx-win27',from:'2027-12-20',to:'2028-01-14',kind:'vac',name:'동계 방학',note:'바뀔 수 있음'},
- {id:'fx-found',from:'2027-09-01',to:'2027-09-01',kind:'closed',name:'공단 창립기념일',note:''}
-];
 const TODAY=K(new Date());
 const KEY='weekday-cal-v1';
+
+/* 확정 일정(방학·휴업일): 두 달력이 같이 쓰는 사용자 목록. 코드의 FX_DEF 는 기본값 (FIXED-2027.md) */
+const FX_KEY='fixed-sched-v1',FX_DEF=[
+ {id:'fx-win26',from:'2026-12-21',to:'2027-01-08',kind:'vac',name:'동계 방학'},
+ {id:'fx-sum27',from:'2027-07-19',to:'2027-08-20',kind:'vac',name:'하계 방학'},
+ {id:'fx-win27',from:'2027-12-20',to:'2028-01-14',kind:'vac',name:'동계 방학'},
+ {id:'fx-found',from:'2027-09-01',to:'2027-09-01',kind:'closed',name:'공단 창립기념일'}
+];
+const defFixed=()=>FX_DEF.map(f=>Object.assign({on:true},f));
+const fxDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&K(P(v))===v&&v>=RMIN&&v<=RMAX;
+function normFixed(a){
+  if(!Array.isArray(a))return null;const seen=new Set(),out=[];
+  for(const f of a){
+    if(out.length>=50)break;
+    if(!f||typeof f!=='object'||typeof f.id!=='string'||!/^[A-Za-z0-9_-]{1,40}$/.test(f.id)||seen.has(f.id)||!fxDate(f.from)||!fxDate(f.to)||(f.kind!=='vac'&&f.kind!=='closed'))continue;
+    seen.add(f.id);const x=f.from<=f.to?[f.from,f.to]:[f.to,f.from];
+    out.push({id:f.id,from:x[0],to:x[1],kind:f.kind,name:String(f.name==null?'':f.name).trim().slice(0,40)||'일정',on:f.on!==false});
+  }
+  return out;
+}
+function loadFixed(){
+  try{const r=localStorage.getItem(FX_KEY);if(r!=null){const n=normFixed(JSON.parse(r));if(n)return n;}}catch(e){}
+  const off=new Set();/* 예전 달력별 '끔' 목록을 처음 한 번만 옮김 */
+  [KEY,'attend-cal-v1'].forEach(k=>{try{const o=JSON.parse(localStorage.getItem(k)||'null');if(o&&Array.isArray(o.disabledFixed))o.disabledFixed.forEach(v=>off.add(v));}catch(e){}});
+  const d=defFixed().map(f=>Object.assign(f,{on:!off.has(f.id)}));
+  if(off.size)try{localStorage.setItem(FX_KEY,JSON.stringify(d));}catch(e){}
+  return d;
+}
+const FIXED=window.KR_FIXED=loadFixed();/* 살아 있는 목록: 제자리에서 바꾼다 */
+const fxSubs=[];
+function fxSet(a){FIXED.splice(0,FIXED.length,...a);try{localStorage.setItem(FX_KEY,JSON.stringify(FIXED));}catch(e){}fxSubs.forEach(f=>f());}
+function fxImport(s){/* 백업에서: 새 형식(fixed) 또는 예전 disabledFixed */
+  const n=normFixed(s.fixed);
+  if(n)fxSet(n);else if(Array.isArray(s.disabledFixed))fxSet(FIXED.map(f=>Object.assign({},f,{on:!s.disabledFixed.includes(f.id)})));
+}
+const fxDays=(a,b)=>{let n=0;for(let d=P(a),e=P(b);d<=e;d=addD(d,1)){const w=d.getDay();if(w&&w<6)n++;}return n;};
+function fxHTML(tip,arm){
+  const kopt=v=>'<option value="vac"'+(v==='vac'?' selected':'')+'>방학</option><option value="closed"'+(v==='closed'?' selected':'')+'>휴업일</option>',rg=' min="'+RMIN+'" max="'+RMAX+'"';
+  let h='<div class="blk"><h4>달력 설정 추가</h4><p class="help">방학 · 휴업일 '+tip('두 달력이 같이 써요 · 휴일이 우선\n출석 달력은 수업 없는 날, 업무 달력은 날짜 칸에 이름이 작게 (평일만)\n끝 날짜를 비우면 하루만')+'</p>';
+  h+='<div class="form"><input class="fi" id="fx-n" placeholder="하계 방학" maxlength="40" aria-label="이름" style="flex:1;min-width:120px"><select class="fi" id="fx-k" aria-label="종류">'+kopt('vac')+'</select><label class="meta">시작 <input class="fi" type="date" id="fx-f"'+rg+' aria-label="시작일"></label><label class="meta">끝 <input class="fi" type="date" id="fx-t"'+rg+' aria-label="끝일"></label><button type="button" class="btn pri" data-act="fx" data-a="fx" data-fxa="add">추가</button></div><div class="err" id="fx-aerr" role="alert"></div></div>';
+  h+='<div class="blk"><h4>달력 설정 '+FIXED.length+'개</h4>';
+  if(!FIXED.length)h+='<div class="empty">달력 설정 없음</div>';
+  FIXED.slice().sort((a,b)=>a.from.localeCompare(b.from)||a.to.localeCompare(b.to)).forEach(f=>{
+    const at=(k,l)=>' id="fx'+k+'-'+f.id+'" data-fxf="'+l+'" data-fxid="'+f.id+'"';
+    h+='<div class="lrow fxr"><input type="checkbox"'+at('o','on')+(f.on?' checked':'')+' aria-label="'+esc(f.name)+' 사용"><input class="fi nm"'+at('n','name')+' value="'+esc(f.name)+'" maxlength="40" aria-label="이름"><select class="fi"'+at('k','kind')+' aria-label="종류">'+kopt(f.kind)+'</select><input class="fi" type="date"'+at('f','from')+rg+' value="'+f.from+'" aria-label="시작일"><span aria-hidden="true">–</span><input class="fi" type="date"'+at('t','to')+rg+' value="'+f.to+'" aria-label="끝일"><span class="meta" style="white-space:nowrap">평일 '+fxDays(f.from,f.to)+'일</span>';
+    h+=arm==='fxdel:'+f.id?'<button type="button" class="btn" data-act="fx" data-a="fx" data-fxa="dis">취소</button><button type="button" class="btn danger arm" data-act="fx" data-a="fx" data-fxa="del" data-fxid="'+f.id+'">삭제 확인</button>':'<button type="button" class="btn danger" data-act="fx" data-a="fx" data-fxa="arm" data-fxid="'+f.id+'" aria-label="'+esc(f.name)+' 삭제">삭제</button>';
+    h+='</div>';
+  });
+  h+='<div class="err" id="fx-err" role="alert" style="margin-top:8px"></div></div>';
+  h+='<div class="blk"><h4>기본값</h4><p class="help">처음 목록으로 되돌려요 · 지금 목록은 사라져요</p><div class="form">'+(arm==='fxrst'?'<button type="button" class="btn" data-act="fx" data-a="fx" data-fxa="dis">취소</button><button type="button" class="btn danger arm" data-act="fx" data-a="fx" data-fxa="rst">되돌리기 확인</button>':'<button type="button" class="btn" data-act="fx" data-a="fx" data-fxa="arst">기본값으로 되돌리기</button>')+'</div></div>';
+  return h;
+}
+/* 버튼: 돌려주는 값 {arm,changed,msg}. 입력칸: fxEdit 이 바꿨으면 true */
+function fxClick(el){
+  const a=el.dataset.fxa,id=el.dataset.fxid,g=i=>document.getElementById(i),er=g('fx-aerr');
+  if(a==='arm')return {arm:'fxdel:'+id};if(a==='arst')return {arm:'fxrst'};if(a==='dis')return {arm:null};
+  if(a==='del'){fxSet(FIXED.filter(f=>f.id!==id));return {arm:null,changed:1,msg:'지웠어요'};}
+  if(a==='rst'){fxSet(defFixed());return {arm:null,changed:1,msg:'기본값으로 되돌렸어요'};}
+  if(a==='add'){
+    const n=g('fx-n').value.trim(),f=g('fx-f').value,t=g('fx-t').value||f,e=m=>{er.textContent=m;return {};};
+    if(!n||!f)return e('이름과 시작일이 필요해요');
+    if(!fxDate(f)||!fxDate(t))return e(RLAB+' 사이만 돼요');
+    if(t<f)return e('끝이 시작보다 빨라요');
+    if(FIXED.length>=50)return e('50개까지 둘 수 있어요');
+    let id2;do{id2='fx-'+Math.random().toString(36).slice(2,9);}while(FIXED.some(x=>x.id===id2));
+    fxSet(FIXED.concat({id:id2,from:f,to:t,kind:g('fx-k').value==='closed'?'closed':'vac',name:n.slice(0,40),on:true}));return {changed:1,msg:'추가했어요'};
+  }
+  return {};
+}
+function fxEdit(el){
+  const f=FIXED.find(x=>x.id===el.dataset.fxid),k=el.dataset.fxf,er=document.getElementById('fx-err');if(!f)return false;
+  const bad=m=>{er.textContent=m;el.value=k==='name'?f.name:f[k];return false;};
+  er.textContent='';
+  if(k==='on')f.on=el.checked;
+  else if(k==='kind')f.kind=el.value==='closed'?'closed':'vac';
+  else if(k==='name'){const v=el.value.trim();if(!v)return bad('이름이 필요해요');f.name=v.slice(0,40);}
+  else{
+    const v=el.value;if(!fxDate(v))return bad(v?RLAB+' 사이만 돼요':'날짜가 필요해요');
+    if(k==='to'&&v<f.from)return bad('끝이 시작보다 빨라요');
+    /* 시작을 끝 뒤로 옮기면 기간 길이를 유지하며 끝도 같이 민다 (범위 끝에서 멈춤) */
+    if(k==='from'&&v>f.to){const day=864e5,len=Math.round((Date.parse(f.to)-Date.parse(f.from))/day);let t=new Date(Date.parse(v)+len*day).toISOString().slice(0,10);if(!fxDate(t))t=v;f.to=t;}
+    f[k]=v;
+  }
+  fxSet(FIXED.slice());return true;
+}
+window.KR_FX={subs:fxSubs,html:fxHTML,click:fxClick,edit:fxEdit,imp:fxImport,list:()=>FIXED.map(f=>Object.assign({},f))};
 
 const DEF_STYLE={bg:'',fg:'',surface:'',holBg:'',holFg:'',todayBg:'',highBg:'',highFg:'',fontSize:14,previewCap:0,hideDone:false,weekendNotes:true};
 const DEF_WP={w:1920,h:1080,place:'right',bg:'#100904',hol:'#f0661a',content:'all'};
@@ -765,7 +845,7 @@ function normalize(s){
   const st=Object.assign({},DEF_STYLE,s.style||{}),wp=Object.assign({},DEF_WP,s.wp||{});
   if(+st.fontSize===13)st.fontSize=14;if(wp.bg==='#1f2a36')wp.bg=DEF_WP.bg;if(wp.hol==='#ff7b72'||wp.hol==='#dc5000')wp.hol=DEF_WP.hol;
   return {items:Array.isArray(s.items)?s.items.filter(i=>i&&i.id&&i.due).map(i=>Object.assign({title:'',start:'',status:'todo',priority:'normal',assignees:[],tags:[],memo:'',checklist:[],links:[]},i)):[],
-    customs:Array.isArray(s.customs)?s.customs.filter(c=>c&&c.date):[],disabledHol:Array.isArray(s.disabledHol)?s.disabledHol:[],disabledFixed:Array.isArray(s.disabledFixed)?s.disabledFixed.filter(v=>FIXED.some(f=>f.id===v)):[],
+    customs:Array.isArray(s.customs)?s.customs.filter(c=>c&&c.date):[],disabledHol:Array.isArray(s.disabledHol)?s.disabledHol:[],
     style:st,wp:wp,tagColors:(s.tagColors&&typeof s.tagColors==='object')?s.tagColors:{},
     tagWeights:(s.tagWeights&&typeof s.tagWeights==='object')?Object.fromEntries(Object.entries(s.tagWeights).filter(([,v])=>v==='strong'||v==='normal'||v==='ref')):{},
     tagDone:(s.tagDone&&typeof s.tagDone==='object')?Object.fromEntries(Object.entries(s.tagDone).filter(([,v])=>v==='on'||v==='off')):{},
@@ -840,7 +920,6 @@ function weeksOf(y,m){
   d=w===6?addD(d,2):w===0?addD(d,1):addD(d,-(w-1));
   const out=[];while(d<=last){out.push([0,1,2,3,4].map(i=>addD(d,i)));d=addD(d,7);}return out;
 }
-const fixRange=f=>{const a=P(f.from),b=P(f.to);return a.getFullYear()+'. '+(a.getMonth()+1)+'/'+a.getDate()+(f.to!==f.from?' – '+(b.getFullYear()!==a.getFullYear()?b.getFullYear()+'. ':'')+(b.getMonth()+1)+'/'+b.getDate():'');};
 const holOn=k=>HOLIDAYS[k]&&!S.disabledHol.includes(k)?HOLIDAYS[k]:null;
 function dayInfo(k){
   const d=P(k),w=d.getDay(),notes=[];
@@ -849,7 +928,7 @@ function dayInfo(k){
     if(w===5)chk(addD(d,1),'토');
     if(w===1)chk(addD(d,-1),'일');
   }
-  if(w>=1&&w<=5)FIXED.forEach(f=>{if(f.from<=k&&k<=f.to&&!S.disabledFixed.includes(f.id))notes.push({t:f.name,f:1});});
+  if(w>=1&&w<=5)FIXED.forEach(f=>{if(f.from<=k&&k<=f.to&&f.on)notes.push({t:f.name,f:1});});
   return {hol:holOn(k),customs:S.customs.filter(c=>c.date===k),notes};
 }
 const PR={high:0,normal:1,low:2};
@@ -1093,6 +1172,7 @@ function renderDetail(){
   el.innerHTML=h;
 }
 function renderAll(){renderSide();renderMain();renderDetail();}
+fxSubs.push(()=>renderMain());
 
 /* ---------- focus ---------- */
 /* 재렌더(innerHTML)로 포커스된 노드가 사라지면 같은 id / data-* 를 가진 새 노드로 포커스를 옮긴다 */
@@ -1303,10 +1383,10 @@ function renderModal(){
     setTimeout(()=>{const s=$('mm-'+ui.mi),b=$('fullb');if(s&&b)b.scrollTop=s.offsetTop-b.offsetTop-4;},20);return;
   }
   if(ui.modal==='settings'){
-    const tabs=[['days','지정일'],['tags','태그'],['syntax','입력'],['links','문서 연결'],['style','스타일'],['wp','배경화면'],['data','백업 · 데이터']];
+    const tabs=[['days','지정일'],['fixed','달력 설정'],['tags','태그'],['syntax','입력'],['links','문서 연결'],['style','스타일'],['wp','배경화면'],['data','백업 · 데이터']];
     let h=head('설정')+'<div class="tabs" role="tablist" aria-label="설정 항목">'+tabs.map(([v,l])=>'<button role="tab" id="tab-'+v+'" aria-controls="setb" aria-selected="'+(ui.stab===v)+'" tabindex="'+(ui.stab===v?0:-1)+'" class="'+(ui.stab===v?'on':'')+'" data-act="stab" data-v="'+v+'">'+l+'</button>').join('')+'</div><div class="mb set" id="setb" role="tabpanel" aria-labelledby="tab-'+ui.stab+'" tabindex="0">';
     const ob=$('setb'),keep=ob&&ui.lastStab===ui.stab?ob.scrollTop:0;ui.lastStab=ui.stab;
-    h+=({days:tabDays,tags:tabTags,syntax:tabSyntax,links:tabLinks,style:tabStyle,wp:tabWp,data:tabData}[ui.stab])();
+    h+=({days:tabDays,fixed:()=>fxHTML(tip,ui.arm),tags:tabTags,syntax:tabSyntax,links:tabLinks,style:tabStyle,wp:tabWp,data:tabData}[ui.stab])();
     md.innerHTML=h+'</div>';if(keep){const nb=$('setb');if(nb)nb.scrollTop=keep;}return;
   }
 }
@@ -1321,8 +1401,6 @@ function tabDays(){
   });
   h+='</div><div class="blk"><h4>기본 공휴일</h4><p class="help">월력요항 기준 '+tip('회사가 쉬지 않는 날은 꺼 두세요\n토·일과 겹친 공휴일은 금·월요일 칸에 작게 표시돼요')+'</p>';
   Object.keys(HOLIDAYS).forEach(k=>{const w=P(k).getDay();h+='<label class="lrow"><input type="checkbox" id="hol-'+k+'" data-hol="'+k+'"'+(S.disabledHol.includes(k)?'':' checked')+'><span class="d">'+fmtD(k)+'</span><span class="nm">'+esc(HOLIDAYS[k])+(w===0||w===6?' <span class="meta">(주말)</span>':'')+'</span></label>';});
-  h+='</div><div class="blk"><h4>확정 일정</h4><p class="help">방학 · 휴업일 '+tip('날짜 칸에 이름이 작게 표시돼요 (평일만)\n바뀐 일정은 꺼 두세요')+'</p>';
-  FIXED.forEach(f=>{h+='<label class="lrow"><input type="checkbox" id="fx-'+f.id+'" data-fx="'+f.id+'"'+(S.disabledFixed.includes(f.id)?'':' checked')+'><span class="d">'+esc(fixRange(f))+'</span><span class="nm">'+esc(f.name)+(f.note?' <span class="meta">'+esc(f.note)+'</span>':'')+'</span></label>';});
   return h+'</div>';
 }
 const SWN=['세이지','머스터드','라일락','로즈','샌드'],koS=(a,b)=>a.localeCompare(b,'ko');
@@ -1425,11 +1503,12 @@ function tabWp(){
   if(ui.wpUrl)h+='<div class="wp-prev"><img src="'+ui.wpUrl+'" alt="바탕화면 미리보기"></div><p class="help" style="margin-top:8px">PNG 우클릭 → 바탕 화면 배경으로 설정 '+tip('저장 버튼이 안 되면 이미지를 우클릭 → 다른 이름으로 이미지 저장')+'</p>';
   return h+'</div>';
 }
+const bkObj=()=>Object.assign({},S,{fixed:FIXED});
 function tabData(){
   const ex=S.items.filter(i=>i.ex).length+S.customs.filter(c=>c.ex).length;
   let h='<div class="blk"><h4>백업</h4><p class="help">이 브라우저에만 저장됨 '+tip('브라우저 기록을 지우거나 PC를 바꾸면 사라질 수 있어요 · 가끔 백업하세요\n다른 PC·다른 파일로 옮길 때도 백업 → 불러오기')+'</p>';
   h+='<div class="form"><button class="btn pri" data-act="bkfile">백업 파일 저장 (.json)</button><button class="btn" data-act="bkcopy">백업 내용 복사</button></div>';
-  h+='<textarea class="fi code" id="bk-out" readonly style="margin-top:8px" aria-label="백업 내용">'+esc(JSON.stringify(S))+'</textarea></div>';
+  h+='<textarea class="fi code" id="bk-out" readonly style="margin-top:8px" aria-label="백업 내용">'+esc(JSON.stringify(bkObj()))+'</textarea></div>';
   h+='<div class="blk"><h4>불러오기</h4><p class="help">지금 데이터를 덮어써요</p><div class="form"><input type="file" id="bk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="bk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기"></textarea><div class="form" style="margin-top:8px">'+(ui.arm==='imp'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-act="armimp">불러오기</button>')+'</div><div class="err" id="bk-err"></div></div>';
   h+='<div class="blk"><h4>정리</h4><div class="form">'+(ex?'<button class="btn" data-act="clearex">예시 항목 '+ex+'개 지우기</button>':'')+(ui.arm==='reset'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="reset">모두 지우기 확인</button>':'<button class="btn danger" data-act="armreset">모든 데이터 지우기</button>')+'</div></div>';
   return h;
@@ -1896,6 +1975,7 @@ document.addEventListener('click',e=>{
    case 'armdel':ui.arm='del';renderDetail();break;
    case 'disarm':ui.arm=null;if(ui.modal)renderModal();else renderDetail();break;
    case 'del':if(it)(it.links||[]).forEach(l=>{if(l.h)delH(l.id);});const dd=it&&it.due;S.items=S.items.filter(i=>i.id!==ui.sel);ui.sel=null;ui.arm=null;ui.detailRet=null;save();renderAll();toast('삭제했어요');if(dd)refocus('#grid .cell[data-day="'+dd+'"]');break;
+   case 'fx':{const r=fxClick(t);if('arm' in r)ui.arm=r.arm;if(r.msg)toast(r.msg);if('arm' in r||r.changed)renderModal();break;}
    case 'stab':ui.stab=t.dataset.v;ui.arm=null;renderModal();break;
    case 'cadd':{const d=$('c-date').value,n=$('c-name').value.trim(),er=$('c-err');
      if(!d||!n){er.textContent='날짜와 이름 필요';break;}
@@ -1907,12 +1987,12 @@ document.addEventListener('click',e=>{
    case 'sreset':S.style[t.dataset.k]='';save();applyStyle();renderModal();break;
    case 'wpmake':{const sm=$('w-m');ui.wpMi=sm?+sm.value:ui.mi;makeWp();break;}
    case 'wpsave':{if(!ui.wpBlob)break;const m=MONTHS[ui.wpMi==null?ui.mi:ui.wpMi];download('달력_'+m.y+'-'+pad(m.m+1)+'.png',ui.wpBlob);break;}
-   case 'bkfile':download('달력백업_'+TODAY+'.json',new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));break;
+   case 'bkfile':download('달력백업_'+TODAY+'.json',new Blob([JSON.stringify(bkObj(),null,1)],{type:'application/json'}));break;
    case 'bkcopy':{const ta=$('bk-out');const txt=ta.value;if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast('복사했어요'),()=>{ta.select();toast('선택된 내용을 Ctrl+C로 복사하세요');});}else{ta.select();toast('선택된 내용을 Ctrl+C로 복사하세요');}break;}
    case 'armimp':{if(!$('bk-in').value.trim()){$('bk-err').textContent='백업 파일이나 내용 필요';break;}ui.pendingImp=$('bk-in').value;ui.arm='imp';renderModal();$('bk-in').value=ui.pendingImp;break;}
-   case 'imp':{try{const s=JSON.parse(ui.pendingImp||$('bk-in').value);if(!s||!Array.isArray(s.items))throw 0;S=normalize(s);save();applyStyle();ui.sel=null;ui.arm=null;renderAll();renderModal();toast('불러왔어요 · 항목 '+S.items.length+'개');}catch(err){ui.arm=null;renderModal();$('bk-err').textContent='백업 형식이 아니에요';}break;}
+   case 'imp':{try{const s=JSON.parse(ui.pendingImp||$('bk-in').value);if(!s||!Array.isArray(s.items))throw 0;S=normalize(s);fxImport(s);save();applyStyle();ui.sel=null;ui.arm=null;renderAll();renderModal();toast('불러왔어요 · 항목 '+S.items.length+'개');}catch(err){ui.arm=null;renderModal();$('bk-err').textContent='백업 형식이 아니에요';}break;}
    case 'armreset':ui.arm='reset';renderModal();break;
-   case 'reset':S={items:[],customs:[],disabledHol:[],disabledFixed:[],style:Object.assign({},DEF_STYLE),wp:Object.assign({},DEF_WP),tagColors:{},tagWeights:{},tagDone:{},kw:{},syn:normSyn()};applySyn();ui.sel=null;ui.arm=null;save();applyStyle();renderAll();renderModal();toast('모두 지웠어요');break;
+   case 'reset':S={items:[],customs:[],disabledHol:[],style:Object.assign({},DEF_STYLE),wp:Object.assign({},DEF_WP),tagColors:{},tagWeights:{},tagDone:{},kw:{},syn:normSyn()};applySyn();ui.sel=null;ui.arm=null;save();applyStyle();renderAll();renderModal();toast('모두 지웠어요');break;
   }
 });
 function submitQA(){
@@ -2004,11 +2084,11 @@ $('modal').addEventListener('input',e=>{
 $('modal').addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.syn||t.dataset.synIn!=null){synValidate(true);return;}
+  if(t.dataset.fxf){if(fxEdit(t)&&(t.dataset.fxf==='from'||t.dataset.fxf==='to'))renderModal();return;}
   if(t.dataset.kw){setTimeout(()=>{renderAll();renderModal();},0);return;}
   if(t.dataset.trn!=null){const m=renameTag(t.dataset.trn,t.value);if(m){save();setTimeout(()=>{renderAll();renderModal();},0);toast(m);}else setTimeout(renderModal,0);return;}
   if(t.dataset.co){const c=S.customs.find(q=>q.id===t.dataset.co);if(c)c.off=t.checked;}
   else if(t.dataset.hol){const k=t.dataset.hol;S.disabledHol=S.disabledHol.filter(x=>x!==k);if(!t.checked)S.disabledHol.push(k);}
-  else if(t.dataset.fx){const k=t.dataset.fx;S.disabledFixed=S.disabledFixed.filter(x=>x!==k);if(!t.checked)S.disabledFixed.push(k);}
   else if(t.dataset.so){S.style[t.dataset.so]=+t.value;applyStyle();}
   else if(t.dataset.sb){S.style[t.dataset.sb]=t.checked;}
   else if(t.dataset.sk){renderModal();}
@@ -2143,7 +2223,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const $=id=>document.getElementById(id);
 const uid=()=>Math.random().toString(36).slice(2,10);
 const DOW='일월화수목금토';
-const HOL=window.KR_HOLIDAYS||{},FIX=window.KR_FIXED||[];
+const HOL=window.KR_HOLIDAYS||{},FIX=window.KR_FIXED||[],FXA=window.KR_FX;
 const TODAY=K(new Date());
 const AKEY='attend-cal-v1',MKEY='cal-mode';
 const AMIN='2026-12-01',AMAX='2028-01-31',ALAB='2026.12 – 2028.01';
@@ -2166,7 +2246,7 @@ const isWk=k=>{const w=P(k).getDay();return w===0||w===6;};
 const pct=v=>v==null?'–':(Math.round(v*1000)/10)+'%';
 
 /* ---------- state ---------- */
-function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map(([s,e])=>({s,e})),kinds:defKinds(),offs:[],lect:{},subjects:defSubjects(),spec:{},att:{},disabledHol:[],disabledFixed:[]};}
+function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map(([s,e])=>({s,e})),kinds:defKinds(),offs:[],lect:{},subjects:defSubjects(),spec:{},att:{},disabledHol:[]};}
 /* 불러온 데이터 검증: id·날짜·교시·색은 형식이 맞는 것만 (HTML 속성에 들어가므로) */
 const ID_RE=/^[A-Za-z0-9_-]{1,40}$/,DATE_RE=/^\d{4}-\d{2}-\d{2}$/,TIME_RE=/^\d{2}:\d{2}$/,HEX_RE=/^#[0-9a-fA-F]{6}$/;
 const okId=v=>typeof v==='string'&&ID_RE.test(v),okDate=v=>typeof v==='string'&&DATE_RE.test(v)?v:'',str=v=>v==null?'':String(v).slice(0,200);
@@ -2190,11 +2270,12 @@ function normA(s){
     periods:arr(s.periods).length===NP?s.periods.map((p,i)=>({s:p&&TIME_RE.test(p.s)?p.s:DEF_P[i][0],e:p&&TIME_RE.test(p.e)?p.e:DEF_P[i][1]})):f.periods,
     kinds:kinds.length?kinds:f.kinds,
     offs:arr(s.offs).filter(o=>hasId(o)&&okDate(o.from)).map(o=>({id:o.id,from:o.from,to:okDate(o.to),kind:okId(o.kind)?o.kind:'event',name:str(o.name),track:tid(o.track),periods:okPs(o.periods),...(o.ex?{ex:true}:{})})),
-    lect,subjects,spec,att,disabledHol:arr(s.disabledHol).filter(v=>typeof v==='string'&&DATE_RE.test(v)),disabledFixed:arr(s.disabledFixed).filter(v=>FIX.some(f=>f.id===v)),ex:!!s.ex
+    lect,subjects,spec,att,disabledHol:arr(s.disabledHol).filter(v=>typeof v==='string'&&DATE_RE.test(v)),ex:!!s.ex
   };
 }
 function loadA(){try{const r=localStorage.getItem(AKEY);if(r)return normA(JSON.parse(r));}catch(e){}return freshA();}
 let A=loadA();
+FXA.subs.push(()=>{SC.clear();if(isAtt())renderA();});
 function saveA(){SC.clear();try{localStorage.setItem(AKEY,JSON.stringify(A));}catch(e){}}
 
 const au={mi:0,track:'',view:'month',wk:null,modal:null,tab:null,day:null,dayTrack:'',sel:new Set(),multi:false,arm:null,
@@ -2224,7 +2305,7 @@ function sched(k,tid){
           if(kd.noClass){if(!o.periods||!o.periods.length){ps=[];if(!r.why)r.why=o.name||kd.name;}else ps=ps.filter(p=>!o.periods.includes(p));}
         }
       });
-      FIX.forEach(f=>{if(f.from<=k&&k<=f.to&&!A.disabledFixed.includes(f.id)){r.labs.push({o:{id:f.id,from:f.from,to:f.to,kind:f.kind,name:f.name,track:'',periods:[],fx:1},kd:fixKind(f)});ps=[];if(!r.why)r.why=f.name;}});
+      FIX.forEach(f=>{if(f.from<=k&&k<=f.to&&f.on){r.labs.push({o:{id:f.id,from:f.from,to:f.to,kind:f.kind,name:f.name,track:'',periods:[],fx:1},kd:fixKind(f)});ps=[];if(!r.why)r.why=f.name;}});
       r.ps=ps;
     }
   }
@@ -2612,7 +2693,8 @@ function hoursTable(fi,ti,tid){
 /* ---- 수업일 설정 ---- */
 function mDays(){
   if(!au.tab)au.tab='offs';
-  let h=headA('수업일 설정')+tabsA([['offs','특이사항 명부'],['kinds','특이사항 종류'],['subj','특별 수업'],['periods','교시 시간'],['hol','법정 공휴일']])+'<div class="mb set">';
+  let h=headA('수업일 설정')+tabsA([['offs','특이사항 명부'],['fixed','달력 설정'],['kinds','특이사항 종류'],['subj','특별 수업'],['periods','교시 시간'],['hol','법정 공휴일']])+'<div class="mb set">';
+  if(au.tab==='fixed')return h+FXA.html(tip,au.arm)+'</div>';
   if(au.tab==='kinds'){
     h+='<div class="blk"><h3>특이사항 종류</h3><p class="help">"수업 없음"을 켠 종류는 훈련소정일수에서 빠져요 '+tip('예) 방학·개별학습·자체 휴업일 → 수업 없음\n행사·특강처럼 수업은 하는 날 → 끔')+'</p>';
     A.kinds.forEach(k=>{const used=A.offs.some(o=>o.kind===k.id)||FIX.some(f=>f.kind===k.id);h+='<div class="lrow"><input type="color" id="kc-'+k.id+'" data-kc="'+k.id+'" value="'+esc(k.color)+'" aria-label="색"><input class="fi nm" id="kn-'+k.id+'" data-kn="'+k.id+'" value="'+esc(k.name)+'" aria-label="이름"><label class="chk"><input type="checkbox" id="kx-'+k.id+'" data-kx="'+k.id+'"'+(k.noClass?' checked':'')+'>수업 없음</label>'+(used?'<span class="meta">사용 중</span>':'<button class="ib" data-a="kdel" data-id="'+k.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
@@ -2650,8 +2732,6 @@ function mDays(){
       h+='<tr><td>'+esc(fmtS(o.from)+(o.to&&o.to!==o.from?' – '+fmtS(o.to):''))+' <span class="meta">'+P(o.from).getFullYear()+'</span></td><td><span style="color:'+esc(kd.color)+'">●</span> '+esc(kd.name)+'</td><td><input class="fi" id="on-'+o.id+'" data-on="'+o.id+'" value="'+esc(o.name)+'" aria-label="이름"></td><td>'+(o.track?esc(trackName(o.track)):'전체')+'</td><td>'+(o.periods&&o.periods.length?o.periods.join('·'):'하루')+'</td><td class="r meta">'+(kd.noClass?'평일 '+n+'일 '+(o.periods&&o.periods.length?'교시 제외':'제외'):'수업함')+'</td><td><button class="ib" data-a="odel" data-id="'+o.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button></td></tr>';});
     h+='</tbody></table></div>';
   }
-  h+='</div><div class="blk"><h3>확정 일정</h3><p class="help">정해진 방학 · 휴업일, 전체 직종 수업 없음 '+tip('바뀐 일정은 꺼 두세요\n공휴일은 그대로 공휴일로 보여요')+'</p>';
-  FIX.forEach(f=>{const kd=fixKind(f),a=P(f.from),b=P(f.to);h+='<label class="lrow"><input type="checkbox" id="af-'+f.id+'" data-af="'+f.id+'"'+(A.disabledFixed.includes(f.id)?'':' checked')+'><span class="d">'+a.getFullYear()+'. '+fmtS(f.from)+(f.to!==f.from?' – '+(b.getFullYear()!==a.getFullYear()?b.getFullYear()+'. ':'')+fmtS(f.to):'')+'</span><span class="nm"><span style="color:'+esc(kd.color)+'">●</span> '+esc(f.name)+(f.note?' <span class="meta">'+esc(f.note)+'</span>':'')+'</span></label>';});
   return h+'</div></div>';
 }
 /* ---- 출결 분석 ---- */
@@ -2964,8 +3044,8 @@ function buildWorkbook(x){
     A.offs.slice().sort((p,q)=>p.from.localeCompare(q.from)).forEach(o=>{const kd=kindOf(o);r3.push([{v:o.from,s:'c'},{v:o.to||o.from,s:'c'},{v:kd.name,s:'l'},{v:o.name,s:'l'},{v:o.track?trackName(o.track):'전체',s:'l'},{v:o.periods&&o.periods.length?o.periods.join(','):'하루',s:'c'},{v:kd.noClass?'Y':'N',s:'c'}]);});
     r3.push([]);r3.push([{v:'법정 공휴일',s:'title'}]);r3.push(['날짜','이름','적용'].map(v=>({v,s:'h'})));
     Object.keys(HOL).filter(k=>k>=AMIN&&k<=AMAX).forEach(k=>r3.push([{v:k,s:'c'},{v:HOL[k],s:'l'},{v:A.disabledHol.includes(k)?'끔':'수업 없음',s:'c'}]));
-    r3.push([]);r3.push([{v:'확정 일정',s:'title'}]);r3.push(['시작','끝','종류','이름','적용'].map(v=>({v,s:'h'})));
-    FIX.forEach(f=>r3.push([{v:f.from,s:'c'},{v:f.to,s:'c'},{v:fixKind(f).name,s:'l'},{v:f.name,s:'l'},{v:A.disabledFixed.includes(f.id)?'끔':'수업 없음',s:'c'}]));
+    r3.push([]);r3.push([{v:'달력 설정',s:'title'}]);r3.push(['시작','끝','종류','이름','적용'].map(v=>({v,s:'h'})));
+    FIX.forEach(f=>r3.push([{v:f.from,s:'c'},{v:f.to,s:'c'},{v:fixKind(f).name,s:'l'},{v:f.name,s:'l'},{v:f.on?'수업 없음':'끔',s:'c'}]));
     sheets.push({name:'수업일 명부',rows:r3,fit:1,cols:[12,12,12,18,10,10,10]});
   }
   return sheets;
@@ -3028,6 +3108,7 @@ document.addEventListener('click',e=>{
     case 'day':if(e.target.closest('.ast')&&e.target.closest('.wsum'))break;au.day=t.dataset.k;au.fk=au.day;au.dayTrack=au.track;openAM('day');break;
     case 'open':openAM(t.dataset.m,{tab:null});break;
     case 'closem':closeAM();break;
+    case 'fx':{const r=FXA.click(t);if('arm' in r)au.arm=r.arm;if(r.msg)toast(r.msg);if('arm' in r||r.changed)renderAM();break;}
     case 'tab':au.tab=v;au.arm=null;renderAM();{const n=$('atab-'+v);n&&n.focus();}break;
     case 'sample':A=sampleA();saveA();au.track='';closeAM();renderA();toast('예시 데이터를 넣었어요');break;
     case 'clearex':{const ex=x=>x&&x.ex;const trk=new Set(A.tracks.filter(ex).map(x=>x.id)),stu=new Set(A.students.filter(ex).map(x=>x.id)),lec=new Set(A.lecturers.filter(ex).map(x=>x.id));
@@ -3095,8 +3176,8 @@ document.addEventListener('click',e=>{
     case 'exall':au.exp.from=0;au.exp.to=AM.length-1;renderAM();break;
     case 'exgo':doExport();break;
     /* 백업 */
-    case 'bk':download('출석백업_'+TODAY+'.json',new Blob([JSON.stringify(A,null,1)],{type:'application/json'}));break;
-    case 'imp':{try{const s=JSON.parse($('abk-in').value||au.pendingImp||'');if(!s||!Array.isArray(s.students))throw 0;A=normA(s);saveA();au.arm=null;au.pendingImp=null;au.track='';renderAM();renderA();toast('불러왔어요 · 학생 '+A.students.length+'명');}catch(err){au.arm=null;renderAM();$('abk-err').textContent='출석 백업 형식이 아니에요';}break;}
+    case 'bk':download('출석백업_'+TODAY+'.json',new Blob([JSON.stringify(Object.assign({},A,{fixed:FXA.list()}),null,1)],{type:'application/json'}));break;
+    case 'imp':{try{const s=JSON.parse($('abk-in').value||au.pendingImp||'');if(!s||!Array.isArray(s.students))throw 0;A=normA(s);FXA.imp(s);saveA();au.arm=null;au.pendingImp=null;au.track='';renderAM();renderA();toast('불러왔어요 · 학생 '+A.students.length+'명');}catch(err){au.arm=null;renderAM();$('abk-err').textContent='출석 백업 형식이 아니에요';}break;}
     case 'reset':A=freshA();au.arm=null;au.track='';saveA();renderAM();renderA();toast('출석 데이터를 지웠어요');break;
   }
 });
@@ -3138,7 +3219,7 @@ $('amodal').addEventListener('change',e=>{
   if(t.dataset.kc){const k=A.kinds.find(q=>q.id===t.dataset.kc);if(k){k.color=t.value;saveA();renderA();}return;}
   if(t.dataset.kx){const k=A.kinds.find(q=>q.id===t.dataset.kx);if(k){k.noClass=t.checked;saveA();renderAM();renderA();}return;}
   if(t.dataset.ps!=null||t.dataset.pe!=null){const i=+(t.dataset.ps??t.dataset.pe);A.periods[i][t.dataset.ps!=null?'s':'e']=t.value;saveA();renderA();return;}
-  if(t.dataset.af){const k=t.dataset.af;A.disabledFixed=A.disabledFixed.filter(x=>x!==k);if(!t.checked)A.disabledFixed.push(k);saveA();renderA();return;}
+  if(t.dataset.fxf){if(FXA.edit(t)&&(t.dataset.fxf==='from'||t.dataset.fxf==='to'))renderAM();return;}
   if(t.dataset.ah){const k=t.dataset.ah;A.disabledHol=A.disabledHol.filter(x=>x!==k);if(!t.checked)A.disabledHol.push(k);saveA();renderA();return;}
   if(t.dataset.exs){au.exp.sh[t.dataset.exs]=t.checked?1:0;return;}
   if(t.id==='ex-from'){au.exp.from=+t.value;if(au.exp.to<au.exp.from)au.exp.to=au.exp.from;renderAM();return;}
