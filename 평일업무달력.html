@@ -503,6 +503,8 @@ button.wh:hover{background:var(--hover)}
 .pc.sel{background:var(--surface);outline:1px solid var(--fg);outline-offset:-3px}
 .pc .on{font-size:11px;font-weight:700}
 .pc .em{color:var(--faint)}
+.pc .sp,.ln.sp{color:var(--c1)}.pc .sp{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:100%}.ln.sp b{color:inherit}
+.dspec{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;font-size:13px}.dspec select.fi{width:auto;padding:5px 2px;font-size:13px}
 .wsum{padding:9px 12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .actbar{position:sticky;bottom:0;z-index:6;background:var(--bg);border-top:2px dashed var(--strong);padding:12px 0;margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px}
 .actbar select.fi,.actbar input.fi{width:auto;padding:5px 2px;font-size:13px}
@@ -2154,6 +2156,7 @@ const MARK={출석:'○',유고결석:'유',무단결석:'무',지각:'지',조�
 const NP=6,PS=[1,2,3,4,5,6];
 const DEF_P=[['09:00','09:45'],['10:00','10:45'],['11:00','11:45'],['13:00','13:45'],['14:00','14:45'],['15:00','15:45']];
 const KC=['#a3c47a','#e6c95c','#c3a0e8','#e08fb6','#cdb79a'];
+const defSubjects=()=>[['sj-health','보건'],['sj-fire','소방재난예방'],['sj-labor','노동인권'],['sj-phys','물리&작업'],['sj-basic','직업기초'],['sj-support','훈련지원'],['sj-pe','특수체육'],['sj-social','사회성훈련']].map(([id,name])=>({id,name}));
 const defKinds=()=>[{id:'vac',name:'방학',noClass:true,color:KC[2]},{id:'self',name:'개별학습',noClass:true,color:KC[0]},{id:'closed',name:'자체 휴업일',noClass:true,color:KC[3]},{id:'event',name:'행사·특강',noClass:false,color:KC[1]}];
 let tipN=0;
 const tip=(t,r)=>{const id='atip-'+(++tipN);return '<button type="button" class="ti'+(r?' r':'')+'" aria-label="도움말" aria-describedby="'+id+'"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg><span class="tt" role="tooltip" id="'+id+'">'+esc(t)+'</span></button>';};
@@ -2163,7 +2166,7 @@ const isWk=k=>{const w=P(k).getDay();return w===0||w===6;};
 const pct=v=>v==null?'–':(Math.round(v*1000)/10)+'%';
 
 /* ---------- state ---------- */
-function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map(([s,e])=>({s,e})),kinds:defKinds(),offs:[],lect:{},att:{},disabledHol:[],disabledFixed:[]};}
+function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map(([s,e])=>({s,e})),kinds:defKinds(),offs:[],lect:{},subjects:defSubjects(),spec:{},att:{},disabledHol:[],disabledFixed:[]};}
 /* 불러온 데이터 검증: id·날짜·교시·색은 형식이 맞는 것만 (HTML 속성에 들어가므로) */
 const ID_RE=/^[A-Za-z0-9_-]{1,40}$/,DATE_RE=/^\d{4}-\d{2}-\d{2}$/,TIME_RE=/^\d{2}:\d{2}$/,HEX_RE=/^#[0-9a-fA-F]{6}$/;
 const okId=v=>typeof v==='string'&&ID_RE.test(v),okDate=v=>typeof v==='string'&&DATE_RE.test(v)?v:'',str=v=>v==null?'':String(v).slice(0,200);
@@ -2177,6 +2180,9 @@ function normA(s){
   const kinds=arr(s.kinds).filter(hasId).map(k=>({id:k.id,name:str(k.name),noClass:!!k.noClass,color:HEX_RE.test(k.color)?k.color:KC[4]}));
   const students=arr(s.students).filter(hasId).map(x=>({id:x.id,name:str(x.name),track:tid(x.track),no:str(x.no),admit:okDate(x.admit),complete:okDate(x.complete),commute:x.commute==='N'?'N':'Y',dorm:okDate(x.dorm),cnp:x.cnp==='Y'?'Y':'N',memo:str(x.memo),...(x.ex?{ex:true}:{})}));
   const lect={};Object.entries(obj(s.lect)).forEach(([k,v])=>{const [d,t]=k.split('|');if(!DATE_RE.test(d)||!tid(t)||!Array.isArray(v))return;const a=Array.from({length:NP},(_,i)=>okId(v[i])?v[i]:'');if(a.some(Boolean))lect[k]=a;});
+  const subjects=Array.isArray(s.subjects)?arr(s.subjects).filter(hasId).filter((x,i,l)=>l.findIndex(y=>y.id===x.id)===i).map(x=>({id:x.id,name:str(x.name),...(HEX_RE.test(x.color)?{color:x.color}:{})})):defSubjects();
+  const subIds=new Set(subjects.map(x=>x.id)),spec={};
+  Object.entries(obj(s.spec)).forEach(([k,v])=>{const [d,t]=k.split('|');if(!DATE_RE.test(d)||!tid(t)||!Array.isArray(v))return;const a=Array.from({length:NP},(_,i)=>okId(v[i])&&subIds.has(v[i])?v[i]:'');if(a.some(Boolean))spec[k]=a;});
   const sids=new Set(students.map(x=>x.id)),att={};
   Object.entries(obj(s.att)).forEach(([k,v])=>{const [d,id]=k.split('|');if(!DATE_RE.test(d)||!sids.has(id)||!v||typeof v!=='object'||!ST.includes(v.s))return;const r={s:v.s};if(PART.includes(v.s))r.p=okPs(v.p);if(v.m)r.m=str(v.m);att[k]=r;});
   return {
@@ -2184,7 +2190,7 @@ function normA(s){
     periods:arr(s.periods).length===NP?s.periods.map((p,i)=>({s:p&&TIME_RE.test(p.s)?p.s:DEF_P[i][0],e:p&&TIME_RE.test(p.e)?p.e:DEF_P[i][1]})):f.periods,
     kinds:kinds.length?kinds:f.kinds,
     offs:arr(s.offs).filter(o=>hasId(o)&&okDate(o.from)).map(o=>({id:o.id,from:o.from,to:okDate(o.to),kind:okId(o.kind)?o.kind:'event',name:str(o.name),track:tid(o.track),periods:okPs(o.periods),...(o.ex?{ex:true}:{})})),
-    lect,att,disabledHol:arr(s.disabledHol).filter(v=>typeof v==='string'&&DATE_RE.test(v)),disabledFixed:arr(s.disabledFixed).filter(v=>FIX.some(f=>f.id===v)),ex:!!s.ex
+    lect,subjects,spec,att,disabledHol:arr(s.disabledHol).filter(v=>typeof v==='string'&&DATE_RE.test(v)),disabledFixed:arr(s.disabledFixed).filter(v=>FIX.some(f=>f.id===v)),ex:!!s.ex
   };
 }
 function loadA(){try{const r=localStorage.getItem(AKEY);if(r)return normA(JSON.parse(r));}catch(e){}return freshA();}
@@ -2192,7 +2198,7 @@ let A=loadA();
 function saveA(){SC.clear();try{localStorage.setItem(AKEY,JSON.stringify(A));}catch(e){}}
 
 const au={mi:0,track:'',view:'month',wk:null,modal:null,tab:null,day:null,dayTrack:'',sel:new Set(),multi:false,arm:null,
-  stat:{mode:'month',mi:0,from:AMIN,to:AMAX,track:'',upto:1},exp:{from:0,to:0,track:'',upto:1,sh:{daily:1,dsum:0,mstat:1,total:1,mrate:1,lcal:1,lhours:1,allow:1,roster:1}},
+  stat:{mode:'month',mi:0,from:AMIN,to:AMAX,track:'',upto:1},exp:{from:0,to:0,track:'',upto:1,sh:{daily:1,dsum:0,mstat:1,total:1,mrate:1,lcal:1,lhours:1,spec:1,allow:1,roster:1}},
   stuF:'',opener:null};
 {const i=AM.findIndex(m=>TODAY.startsWith(ymOf(m)));au.mi=i>=0?i:(TODAY<AMIN?0:AM.length-1);au.stat.mi=au.mi;au.exp.from=au.mi;au.exp.to=au.mi;}
 function fixTrack(){const gone=id=>id&&!A.tracks.some(t=>t.id===id);if(gone(au.track))au.track='';if(gone(au.stat.track))au.stat.track='';if(gone(au.exp.track))au.exp.track='';if(gone(au.stuF))au.stuF='';if(gone(au.dayTrack))au.dayTrack='';if(!au.track&&A.tracks.length&&au.view==='week')au.track=A.tracks[0].id;}
@@ -2228,6 +2234,7 @@ const enrolled=(s,k)=>(!s.admit||s.admit<=k)&&(!s.complete||k<=s.complete);
 const isDorm=(s,k)=>s.dorm?k>=s.dorm:s.commute==='N';
 const trackName=id=>{const t=A.tracks.find(x=>x.id===id);return t?t.name:'(직종 없음)';};
 const lectName=id=>{const l=A.lecturers.find(x=>x.id===id);return l?l.name:'';};
+const subjName=id=>{const x=A.subjects.find(q=>q.id===id);return x?x.name:'';};
 const stuSorted=tid=>{const ord={};A.tracks.forEach((t,i)=>ord[t.id]=i);return A.students.filter(s=>!tid||s.track===tid).sort((a,b)=>((ord[a.track]??99)-(ord[b.track]??99))||(a.no||'').localeCompare(b.no||'',undefined,{numeric:true})||a.name.localeCompare(b.name,'ko'));};
 /* 하루 출결 판정: 50% 미만 출석이면 지각·조퇴·결과도 결석 */
 function evalDay(s,k){
@@ -2275,6 +2282,22 @@ function lectRuns(k,tid){/* 같은 강사가 이어진 교시를 묶어 [{lid,a,
   PS.forEach(p=>{const l=sc.ps.includes(p)?arr[p-1]:'';const last=runs[runs.length-1];if(l&&last&&last.lid===l&&last.b===p-1)last.b=p;else if(l)runs.push({lid:l,a:p,b:p});});
   return runs;
 }
+/* 특별 수업: 같은 과목이 이어진 교시를 묶어 [{lid(=과목 id),a,b}] (수업 있는 교시만) */
+function specRuns(k,tid){
+  const arr=A.spec[k+'|'+tid]||[],sc=sched(k,tid),runs=[];
+  PS.forEach(p=>{const l=sc.ps.includes(p)?arr[p-1]:'';const last=runs[runs.length-1];if(l&&last&&last.lid===l&&last.b===p-1)last.b=p;else if(l)runs.push({lid:l,a:p,b:p});});
+  return runs;
+}
+/* 특별 수업 시수 (교시 = 1시수, 수업 있는 교시만): out[sid][ym][tid]=n */
+function specHours(a,b){
+  const out={};
+  Object.keys(A.spec).forEach(key=>{
+    const [k,tid]=key.split('|');if(k<a||k>b||isWk(k))return;
+    const sc=sched(k,tid);
+    A.spec[key].forEach((sid,i)=>{if(!sid||!sc.ps.includes(i+1))return;const ym=k.slice(0,7);((out[sid]=out[sid]||{})[ym]=out[sid][ym]||{})[tid]=(out[sid][ym][tid]||0)+1;});
+  });
+  return out;
+}
 const runTxt=r=>(r.a===r.b?r.a:r.a+'–'+r.b)+'교시';
 function offLabel(k,tid,p){return sched(k,tid).labs.filter(x=>offCovers(x.o,p)).map(x=>x.o.name||x.kd.name).join(', ');}
 
@@ -2296,6 +2319,9 @@ function sampleA(){
     if(i%3===0)s.lect[k+'|'+T[1].id]=['','','',L[1].id,L[1].id,L[1].id];
     if(i%5===1)s.lect[k+'|'+T[2].id]=[L[2].id,L[2].id,'','','',''];
   });
+  const sj=n=>defSubjects().find(x=>x.name===n).id;
+  [['2026-12-02',0,[1,2],'보건'],['2026-12-03',0,[3],'소방재난예방'],['2026-12-07',1,'all','노동인권'],['2026-12-08',1,[5,6],'물리&작업'],['2026-12-09',2,[1,2,3],'직업기초'],['2026-12-14',0,'all','특수체육'],['2026-12-15',2,[4,5],'사회성훈련'],['2026-12-16',1,[1,2],'훈련지원']].forEach(([k,t,ps,n])=>{
+    const a=Array(NP).fill('');(ps==='all'?PS:ps).forEach(p=>a[p-1]=sj(n));s.spec[k+'|'+s.tracks[t].id]=a;});
   const id=n=>s.students.find(x=>x.name===n).id;
   [s.tracks,s.students,s.lecturers,s.offs].forEach(l=>l.forEach(x=>x.ex=true));
   Object.assign(s.att,{['2026-12-02|'+id('김하늘')]:{s:'지각',p:[1]},['2026-12-03|'+id('김하늘')]:{s:'지각',p:[1]},['2026-12-08|'+id('김하늘')]:{s:'조퇴',p:[6]},
@@ -2352,7 +2378,7 @@ function renderBarA(){
   if(A.tracks.length){
     h+='<span class="lbl">직종</span>'+segA('track',au.track,(au.view==='week'?[]:[['','전체']]).concat(A.tracks.map(t=>[t.id,t.name])));
     h+='<span class="lbl">보기</span>'+segA('view',au.view,[['month','월'],['week','주 시간표']]);
-    h+=tip('월: 날짜를 누르면 그날 시간표·출결 입력\n주 시간표: 교시 칸을 끌어서 여러 칸을 고른 뒤 외부강사·특이사항을 한꺼번에 넣어요 (Ctrl+클릭으로 추가 선택)\n\n출결 기본값은 출석 · 바뀐 학생만 고르면 돼요');
+    h+=tip('월: 날짜를 누르면 그날 시간표·출결 입력\n주 시간표: 교시 칸을 끌어서 여러 칸을 고른 뒤 외부강사·특별 수업·특이사항을 한꺼번에 넣어요 (Ctrl+클릭으로 추가 선택)\n\n출결 기본값은 출석 · 바뀐 학생만 고르면 돼요');
   }
   if(A.ex)h+='<span class="banner" style="margin:0">예시 데이터 <button data-a="clearex">지우기</button></span>';
   $('a-bar').innerHTML=h;
@@ -2381,8 +2407,10 @@ function acell(d,inMonth){
   if(!inMonth)return h+'</div>';
   if(sc.ps.length){
     if(sc.ps.length<NP)h+='<div class="ln">수업 '+sc.ps.length+'교시</div>';
-    if(tid){lectRuns(k,tid).forEach(r=>{h+='<div class="ln"><b>'+esc(lectName(r.lid))+'</b> '+runTxt(r)+'</div>';});}
-    else{const ls=new Set();A.tracks.forEach(t=>lectRuns(k,t.id).forEach(r=>ls.add(r.lid)));if(ls.size)h+='<div class="ln">강사 <b>'+esc([...ls].map(lectName).join(', '))+'</b></div>';}
+    if(tid){lectRuns(k,tid).forEach(r=>{h+='<div class="ln"><b>'+esc(lectName(r.lid))+'</b> '+runTxt(r)+'</div>';});
+      const sr=specRuns(k,tid);if(sr.length){const full=sr.length===1&&sr[0].a===sc.ps[0]&&sr[0].b===sc.ps[sc.ps.length-1];const tt='특별 수업 '+sr.map(r=>subjName(r.lid)+' '+runTxt(r)).join(', ');h+='<div class="ln sp" title="'+esc(tt)+'">특별 <b>'+esc(sr.map(r=>subjName(r.lid)).filter((v,i,l)=>l.indexOf(v)===i).join(', '))+'</b>'+(full?'':' '+esc(sr.map(runTxt).join(' ')))+'</div>';}}
+    else{const ls=new Set(),ss=new Set();A.tracks.forEach(t=>{lectRuns(k,t.id).forEach(r=>ls.add(r.lid));specRuns(k,t.id).forEach(r=>ss.add(r.lid));});if(ls.size)h+='<div class="ln">강사 <b>'+esc([...ls].map(lectName).join(', '))+'</b></div>';
+      if(ss.size){const nm=[...ss].map(subjName);h+='<div class="ln sp" title="'+esc('특별 수업 '+nm.join(', '))+'">특별 <b>'+esc(nm.join(', '))+'</b></div>';}}
     h+=daySummary(k,tid);
   }else if(!sc.hol&&!sc.labs.length)h+='<div class="ln">수업 없음</div>';
   return h+'</div>';
@@ -2407,12 +2435,12 @@ function weekCells(days,tid){/* 주 시간표 그리드 */
   return h+'</div>';
 }
 function pcell(k,tid,p,di){
-  const sc=sched(k,tid),inP=sc.ps.includes(p),arr=A.lect[k+'|'+tid]||[],lid=arr[p-1]||'',ol=offLabel(k,tid,p),key=k+'|'+p;
+  const sc=sched(k,tid),inP=sc.ps.includes(p),arr=A.lect[k+'|'+tid]||[],lid=arr[p-1]||'',ol=offLabel(k,tid,p),key=k+'|'+p,sj=inP&&(A.spec[k+'|'+tid]||[])[p-1]||'';
   const cls='pc'+(sc.hol?' hol':!inP?' no':'')+(au.sel.has(key)?' sel':'');
   let inner='';
   if(sc.hol)inner=p===1?esc(sc.hol):'';
-  else{if(ol)inner+='<span class="on" style="color:'+esc((sc.labs.find(x=>offCovers(x.o,p))||{kd:{color:''}}).kd.color)+'">'+esc(ol)+'</span>';if(lid&&inP)inner+='<span>'+esc(lectName(lid))+'</span>';else if(inP&&!ol)inner+='<span class="em">·</span>';}
-  return '<button class="'+cls+'" data-pc="1" data-k="'+k+'" data-p="'+p+'" data-di="'+di+'" aria-pressed="'+au.sel.has(key)+'" aria-label="'+esc(fmtD(k)+' '+p+'교시'+(lid?' '+lectName(lid):'')+(ol?' '+ol:'')+(inP?'':' 수업 없음'))+'">'+inner+'</button>';
+  else{if(ol)inner+='<span class="on" style="color:'+esc((sc.labs.find(x=>offCovers(x.o,p))||{kd:{color:''}}).kd.color)+'">'+esc(ol)+'</span>';if(sj&&subjName(sj))inner+='<span class="sp" title="특별 수업 '+esc(subjName(sj))+'">'+esc(subjName(sj))+'</span>';if(lid&&inP)inner+='<span>'+esc(lectName(lid))+'</span>';else if(inP&&!ol&&!sj)inner+='<span class="em">·</span>';}
+  return '<button class="'+cls+'" data-pc="1" data-k="'+k+'" data-p="'+p+'" data-di="'+di+'" aria-pressed="'+au.sel.has(key)+'" aria-label="'+esc(fmtD(k)+' '+p+'교시'+(lid?' '+lectName(lid):'')+(sj&&subjName(sj)?' 특별 수업 '+subjName(sj):'')+(ol?' '+ol:'')+(inP?'':' 수업 없음'))+'">'+inner+'</button>';
 }
 function renderWeek(){
   const tid=au.track;if(!au.wk)au.wk=monOf(defaultDayA());
@@ -2430,6 +2458,9 @@ function renderActBar(){
   if(A.lecturers.length){h+='<select class="fi" id="act-lec" aria-label="외부강사">'+A.lecturers.map(l=>'<option value="'+l.id+'"'+(l.id===au.lastLec?' selected':'')+'>'+esc(l.name)+(l.subject?' · '+esc(l.subject):'')+'</option>').join('')+'</select><button class="btn" data-a="aplec">강사 넣기</button>';}
   else h+='<button class="btn" data-a="open" data-m="lects">강사 명단 먼저 추가</button>';
   h+='<button class="btn" data-a="cllec">강사 비우기</button><span class="sep"></span>';
+  if(A.subjects.length){h+='<select class="fi" id="act-spec" aria-label="특별 수업 과목">'+A.subjects.map(x=>'<option value="'+x.id+'"'+(x.id===au.lastSpec?' selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select><button class="btn" data-a="apspec">특별 수업 넣기</button><button class="btn" data-a="apspecday" title="고른 칸이 있는 날의 수업 교시 전부">하루 전체로</button>';}
+  else h+='<button class="btn" data-a="opensubj">특별 수업 과목 먼저 추가</button>';
+  h+='<button class="btn" data-a="clspec">특별 수업 빼기</button><span class="sep"></span>';
   h+='<select class="fi" id="act-kind" aria-label="특이사항 종류">'+A.kinds.map(k=>'<option value="'+k.id+'"'+(k.id===au.lastKind?' selected':'')+'>'+esc(k.name)+(k.noClass?' (수업 없음)':'')+'</option>').join('')+'</select><input class="fi" id="act-name" placeholder="메모 (선택)" aria-label="특이사항 메모" style="width:130px"><button class="btn" data-a="apoff">특이사항 넣기</button><button class="btn" data-a="cloff">특이사항 지우기</button>';
   h+='<span class="sep"></span><button class="btn" data-a="clsel">선택 해제</button>';
   el.innerHTML=h;
@@ -2440,6 +2471,22 @@ function applyLec(lid){
   const tid=selTrack();if(!tid){toast('직종을 먼저 고르세요');return;}let skip=0,n=0;
   Object.entries(selGroups()).forEach(([k,ps])=>{const sc=sched(k,tid),key=k+'|'+tid;const arr=(A.lect[key]||Array(NP).fill('')).slice();ps.forEach(p=>{if(lid&&!sc.ps.includes(p)){skip++;return;}arr[p-1]=lid;n++;});if(arr.some(Boolean))A.lect[key]=arr;else delete A.lect[key];});
   saveA();au.sel.clear();rerender();toast((lid?lectName(lid)+' '+n+'교시 넣음':n+'교시 비움')+(skip?' · 수업 없는 '+skip+'칸 제외':''));
+}
+/* 특별 수업: sid='' 이면 빼기 · whole 이면 고른 칸이 있는 날의 수업 교시 전부 */
+function applySpec(sid,whole){
+  const tid=selTrack();if(!tid){toast('직종을 먼저 고르세요');return;}let skip=0,n=0;
+  Object.entries(selGroups()).forEach(([k,ps])=>{const sc=sched(k,tid),key=k+'|'+tid;const arr=(A.spec[key]||Array(NP).fill('')).slice();
+    if(whole)ps=sid?sc.ps:PS;
+    ps.forEach(p=>{if(sid&&!sc.ps.includes(p)){skip++;return;}arr[p-1]=sid;n++;});
+    if(arr.some(Boolean))A.spec[key]=arr;else delete A.spec[key];});
+  saveA();au.sel.clear();rerender();toast((sid?(n?subjName(sid)+' '+n+'교시 넣음':'넣을 수업 교시가 없어요'):'특별 수업 '+n+'교시 뺌')+(skip?' · 수업 없는 '+skip+'칸 제외':''));
+}
+function applySpecDay(k,tid,sid){/* 하루 모달: 그 직종 그날의 수업 교시 전부 (sid='' 이면 전부 빼기) */
+  if(!tid)return;const sc=sched(k,tid),key=k+'|'+tid;
+  if(sid&&!sc.ps.length){toast('수업 없는 날이에요');return;}
+  const arr=(A.spec[key]||Array(NP).fill('')).slice();PS.forEach(p=>{if(!sid)arr[p-1]='';else if(sc.ps.includes(p))arr[p-1]=sid;});
+  if(arr.some(Boolean))A.spec[key]=arr;else delete A.spec[key];
+  saveA();rerender();toast(sid?subjName(sid)+' 하루 전체 · '+sc.ps.length+'교시':'특별 수업을 뺐어요');
 }
 function applyOff(kind,name){
   const tid=selTrack();if(!tid){toast('직종을 먼저 고르세요');return;}
@@ -2485,9 +2532,10 @@ function mDay(){
   let h=headA(esc(fmtD(k))+' <span class="meta" style="font-weight:400">'+(sc.hol?esc(sc.hol):sc.ps.length?'훈련일 · '+sc.ps.length+'교시':'수업 없음'+(sc.why?' · '+esc(sc.why):''))+'</span>')+'<div class="mb">';
   h+='<div class="a-bar"><button class="ghost" data-a="dayprev" aria-label="이전 평일"><svg class="i"><use href="#i-l"/></svg></button><button class="ghost" data-a="daynext" aria-label="다음 평일"><svg class="i"><use href="#i-r"/></svg></button><span class="lbl">직종</span>'+segA('dtrack',tid,A.tracks.map(t=>[t.id,t.name]))+'</div>';
   if(sc.labs.length)h+='<div class="labs">'+sc.labs.map(x=>'<span class="badge" style="color:'+esc(x.kd.color)+';border-color:'+esc(x.kd.color)+'">'+esc((x.o.name||x.kd.name)+(x.o.periods&&x.o.periods.length?' '+x.o.periods.join('·')+'교시':'')+(x.kd.noClass?' · 수업 없음':''))+'</span>').join('')+'</div>';
-  h+='<div class="sec" style="margin-top:6px">시간표 · 외부강사 '+tip('교시 칸을 끌어서 고른 뒤 아래 막대에서 강사·특이사항을 넣어요')+'</div>';
+  h+='<div class="sec" style="margin-top:6px">시간표 · 외부강사 '+tip('교시 칸을 끌어서 고른 뒤 아래 막대에서 강사·특별 수업·특이사항을 넣어요')+'</div>';
   if(sc.hol||sc.wk)h+='<div class="empty">'+esc(sc.hol||'주말')+'</div>';
   else{
+    if(sc.ps.length&&A.subjects.length){const has=(A.spec[k+'|'+tid]||[]).some(Boolean);h+='<div class="dspec"><span class="meta">특별 수업 · 하루 전체</span><select class="fi" id="day-spec" aria-label="특별 수업 과목">'+A.subjects.map(x=>'<option value="'+x.id+'"'+(x.id===au.lastSpec?' selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select><button class="btn" data-a="dayspec">하루 전체로 넣기</button>'+(has?'<button class="btn" data-a="dayspecclr">특별 수업 모두 빼기</button>':'')+tip('그날 이 직종의 수업 교시를 모두 이 과목으로 채워요\n일부 교시만 넣으려면 아래 시간표에서 칸을 고른 뒤 막대에서 넣으세요')+'</div>';}
     h+='<div class="dayp" data-selroot>';
     PS.forEach(p=>{h+='<div class="pl">'+p+'교시<small>'+esc(A.periods[p-1].s)+'–'+esc(A.periods[p-1].e)+'</small></div>'+pcell(k,tid,p,0);});
     h+='</div><div class="actbar" id="d-act"></div>';
@@ -2564,11 +2612,19 @@ function hoursTable(fi,ti,tid){
 /* ---- 수업일 설정 ---- */
 function mDays(){
   if(!au.tab)au.tab='offs';
-  let h=headA('수업일 설정')+tabsA([['offs','특이사항 명부'],['kinds','특이사항 종류'],['periods','교시 시간'],['hol','법정 공휴일']])+'<div class="mb set">';
+  let h=headA('수업일 설정')+tabsA([['offs','특이사항 명부'],['kinds','특이사항 종류'],['subj','특별 수업'],['periods','교시 시간'],['hol','법정 공휴일']])+'<div class="mb set">';
   if(au.tab==='kinds'){
     h+='<div class="blk"><h3>특이사항 종류</h3><p class="help">"수업 없음"을 켠 종류는 훈련소정일수에서 빠져요 '+tip('예) 방학·개별학습·자체 휴업일 → 수업 없음\n행사·특강처럼 수업은 하는 날 → 끔')+'</p>';
     A.kinds.forEach(k=>{const used=A.offs.some(o=>o.kind===k.id)||FIX.some(f=>f.kind===k.id);h+='<div class="lrow"><input type="color" id="kc-'+k.id+'" data-kc="'+k.id+'" value="'+esc(k.color)+'" aria-label="색"><input class="fi nm" id="kn-'+k.id+'" data-kn="'+k.id+'" value="'+esc(k.name)+'" aria-label="이름"><label class="chk"><input type="checkbox" id="kx-'+k.id+'" data-kx="'+k.id+'"'+(k.noClass?' checked':'')+'>수업 없음</label>'+(used?'<span class="meta">사용 중</span>':'<button class="ib" data-a="kdel" data-id="'+k.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
     h+='<div class="form" style="margin-top:14px"><input class="fi" id="k-name" placeholder="새 종류 (예: 현장실습)" aria-label="새 종류" style="flex:1;min-width:160px"><label class="chk"><input type="checkbox" id="k-x" checked>수업 없음</label><button class="btn pri" data-a="kadd">추가</button></div></div>';
+    return h+'</div>';
+  }
+  if(au.tab==='subj'){
+    const use=id=>Object.entries(A.spec).reduce((t,[k,a])=>t+a.filter(x=>x===id).length,0);
+    h+='<div class="blk"><h3>특별 수업 과목 '+A.subjects.length+'개</h3><p class="help">수업 있는 날 일반 수업 대신 들어가는 세부과목 '+tip('주 시간표·하루 창에서 직종·날짜별로 교시 단위 또는 하루 전체로 넣어요\n외부강사와는 따로 — 한 교시에 둘 다 넣을 수 있어요\n과목을 지우면 넣어 둔 특별 수업도 같이 빠져요')+'</p>';
+    if(!A.subjects.length)h+='<div class="empty">과목 없음</div>';
+    A.subjects.forEach((x,i)=>{const n=use(x.id);h+='<div class="lrow"><span class="d">'+(i+1)+'</span><input class="fi nm" id="sjn-'+x.id+'" data-sjn="'+x.id+'" value="'+esc(x.name)+'" aria-label="과목 이름"><span class="meta">'+(n?n+'교시 사용':'')+'</span><button class="ib" data-a="sjup" data-id="'+x.id+'" aria-label="위로" title="위로"><svg class="i" style="transform:rotate(90deg)"><use href="#i-l"/></svg></button>'+(au.arm==='sj:'+x.id?'<button class="btn danger arm" data-a="sjdel" data-id="'+x.id+'">'+(n?n+'교시도 빼기':'삭제 확인')+'</button>':'<button class="ib" data-a="arm" data-v="sj:'+x.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
+    h+='<div class="form" style="margin-top:14px"><input class="fi" id="sj-name" placeholder="새 과목 (예: 안전교육)" aria-label="새 과목" style="flex:1;min-width:160px"><button class="btn pri" data-a="sjadd">추가</button></div><div class="form" style="margin-top:10px"><button class="btn" data-a="sjdef">기본 과목으로 되돌리기</button></div></div>';
     return h+'</div>';
   }
   if(au.tab==='periods'){
@@ -2632,7 +2688,7 @@ function mStats(){
   return h+'</div>';
 }
 /* ---- 엑셀 ---- */
-const SHEETS=[['daily','일별 교시 출결표','달마다 시트 · 학생 × 날짜×교시 · 외부강사 줄 포함'],['dsum','일별 출결 요약','달마다 시트 · 하루 한 칸'],['mstat','월별 통계','달마다 학생별 소정일·출석·결석'],['total','누적 통계','고른 기간 전체'],['mrate','월별 출석률 표','학생 × 달'],['lcal','외부강사 내역 (달력)','달마다 달력 모양 + 강사별 시수'],['lhours','외부강사 월별 시수','강사 × 달, 직종별'],['allow','수당 기초자료','통학·기숙 출석일, 취성패'],['roster','명부','학생부 · 강사 명단 · 수업일 명부']];
+const SHEETS=[['daily','일별 교시 출결표','달마다 시트 · 학생 × 날짜×교시 · 외부강사 줄 포함'],['dsum','일별 출결 요약','달마다 시트 · 하루 한 칸'],['mstat','월별 통계','달마다 학생별 소정일·출석·결석'],['total','누적 통계','고른 기간 전체'],['mrate','월별 출석률 표','학생 × 달'],['lcal','외부강사 내역 (달력)','달마다 달력 모양 + 강사별 시수'],['lhours','외부강사 월별 시수','강사 × 달, 직종별'],['spec','특별 수업','날짜·직종·교시별 과목 + 과목별 시수'],['allow','수당 기초자료','통학·기숙 출석일, 취성패'],['roster','명부','학생부 · 강사 명단 · 수업일 명부']];
 function mExport(){
   const x=au.exp;
   let h=headA('엑셀 내보내기')+'<div class="mb set"><div class="blk"><h3>범위</h3><div class="form"><select class="fi" id="ex-from" aria-label="시작 달">'+monthOpts(x.from)+'</select> – <select class="fi" id="ex-to" aria-label="끝 달">'+monthOpts(x.to)+'</select><select class="fi" id="ex-track" aria-label="직종">'+trackOpts(x.track,'전체 직종')+'</select><button class="btn" data-a="exall">전체 기간</button></div><label class="chk" style="margin-top:8px"><input type="checkbox" id="ex-upto"'+(x.upto?' checked':'')+'>오늘('+TODAY.replace(/-/g,'.')+')까지만 출결 집계 <span class="meta">끄면 미래 날짜도 출석으로 셈 · 강사 시수는 예정 포함</span></label></div>';
@@ -2867,6 +2923,26 @@ function buildWorkbook(x){
     rows.push([{v:'전체',s:'tot'},{v:'',s:'tot'},{v:'',s:'tot'}].concat(tot.map(n=>({v:n,s:'totn'})),[{v:tot.reduce((p,q)=>p+q,0),s:'totn'}]));
     sheets.push({name:'강사 월별 시수',rows,fit:1,freeze:[3,1],cols:[10,14,10].concat(ms.map(()=>7),[8])});
   }
+  /* 7-2. 특별 수업 */
+  if(x.sh.spec){
+    const rows=[[{v:'특별 수업 (날짜 × 직종 × 교시)',s:'title'}],[{v:'회색 = 수업 없는 교시 · 시수 = 수업 있는 교시만 셈',s:'note'}],[]],merges=[];
+    rows.push(['날짜','요일','직종'].concat(PS.map(p=>p+'교시'),['시수']).map(v=>({v,s:'h'})));
+    const keys=Object.keys(A.spec).filter(key=>{const [k,tid]=key.split('|');return k>=A0&&k<=B0&&!isWk(k)&&tr.some(t=>t.id===tid);}).sort((p,q)=>{const [k1,t1]=p.split('|'),[k2,t2]=q.split('|');return k1.localeCompare(k2)||(A.tracks.findIndex(t=>t.id===t1)-A.tracks.findIndex(t=>t.id===t2));});
+    let cnt=0;
+    keys.forEach(key=>{const [k,tid]=key.split('|'),sc=sched(k,tid),arr=A.spec[key];let n=0;
+      const row=[{v:k,s:'c'},{v:DOW[P(k).getDay()],s:'c'},{v:trackName(tid),s:'l'}];
+      PS.forEach(p=>{if(!sc.ps.includes(p)){row.push({v:'',s:'off'});return;}const nm=arr[p-1]?subjName(arr[p-1]):'';if(nm)n++;row.push({v:nm,s:nm?'lec':'c'});});
+      if(!n)return;row.push({v:n,s:'n'});rows.push(row);cnt+=n;});
+    if(rows.length===4)rows.push([{v:'넣은 특별 수업 없음',s:'note'}]);
+    else rows.push([{v:'합계',s:'tot'},{v:'',s:'tot'},{v:'',s:'tot'}].concat(PS.map(()=>({v:'',s:'tot'})),[{v:cnt,s:'totn'}]));
+    rows.push([]);rows.push([{v:'과목별 시수',s:'title'}]);
+    const SH=specHours(A0,B0);
+    rows.push([{v:'과목',s:'h'},{v:'직종',s:'h'},{v:'',s:'h'}].concat(ms.map(m=>({v:ymShort(m),s:'h'})),[{v:'합계',s:'h'}]));
+    const tot=ms.map(()=>0);
+    A.subjects.forEach(sj=>{if(!SH[sj.id])return;tr.forEach(t=>{const per=ms.map(m=>((SH[sj.id][ymOf(m)]||{})[t.id])||0);if(!per.some(Boolean))return;per.forEach((n,i)=>tot[i]+=n);rows.push([{v:sj.name,s:'l'},{v:t.name,s:'l'},{v:'',s:'l'}].concat(per.map(n=>({v:n,s:'n'})),[{v:per.reduce((p,q)=>p+q,0),s:'n'}]));});});
+    rows.push([{v:'전체',s:'tot'},{v:'',s:'tot'},{v:'',s:'tot'}].concat(tot.map(n=>({v:n,s:'totn'})),[{v:tot.reduce((p,q)=>p+q,0),s:'totn'}]));
+    sheets.push({name:'특별 수업',rows,fit:1,cols:[12,8,12,12,12,12,12,12,12,8].concat(Array(Math.max(0,ms.length-6)).fill(8))});
+  }
   /* 8. 수당 기초자료 */
   if(x.sh.allow){
     const rows=[[{v:'훈련수당 기초자료',s:'title'}],[{v:'통학/기숙 출석일 = 결석이 아닌 날을 그날의 통학·기숙 여부로 나눠 셈 · 취성패 Y는 훈련참여수당 0원 · 수당 금액 칸은 직접 입력',s:'note'}]];
@@ -2901,7 +2977,7 @@ function doExport(){
   const name='출결_'+ymShort(f).replace('.','')+(f!==t?'-'+ymShort(t).replace('.',''):'')+(x.track?'_'+trackName(x.track):'')+'.xlsx';
   download(name,XL.book(sheets));toast('엑셀 '+sheets.length+'개 시트 저장');
 }
-window.__attTest={buildWorkbook,book:s=>XL.book(s),get A(){return A;},set A(v){A=normA(v);SC.clear();},sampleA,statStu,evalDay,sched,au};
+window.__attTest={buildWorkbook,specHours,specRuns,book:s=>XL.book(s),get A(){return A;},set A(v){A=normA(v);SC.clear();},sampleA,statStu,evalDay,sched,au};
 
 /* ---------- 붙여넣기로 학생 추가 ---------- */
 function normDate(v){
@@ -2957,10 +3033,21 @@ document.addEventListener('click',e=>{
     case 'clearex':{const ex=x=>x&&x.ex;const trk=new Set(A.tracks.filter(ex).map(x=>x.id)),stu=new Set(A.students.filter(ex).map(x=>x.id)),lec=new Set(A.lecturers.filter(ex).map(x=>x.id));
       A.tracks=A.tracks.filter(x=>!ex(x));A.students=A.students.filter(x=>!ex(x));A.lecturers=A.lecturers.filter(x=>!ex(x));A.offs=A.offs.filter(x=>!ex(x));
       Object.keys(A.lect).forEach(k=>{if(trk.has(k.split('|')[1]))delete A.lect[k];else A.lect[k]=A.lect[k].map(l=>lec.has(l)?'':l);});
+      Object.keys(A.spec).forEach(k=>{if(trk.has(k.split('|')[1]))delete A.spec[k];});
       Object.keys(A.att).forEach(k=>{if(stu.has(k.split('|')[1]))delete A.att[k];});A.ex=false;saveA();au.track='';if(au.modal)renderAM();renderA();toast('예시를 지웠어요');break;}
     /* 선택 막대 */
     case 'aplec':{const s=$('act-lec');if(s){au.lastLec=s.value;applyLec(s.value);}break;}
     case 'cllec':applyLec('');break;
+    case 'apspec':{const s=$('act-spec');if(s){au.lastSpec=s.value;applySpec(s.value,false);}break;}
+    case 'apspecday':{const s=$('act-spec');if(s){au.lastSpec=s.value;applySpec(s.value,true);}break;}
+    case 'clspec':applySpec('',false);break;
+    case 'opensubj':openAM('days',{tab:'subj'});break;
+    case 'dayspec':{const s=$('day-spec');if(s){au.lastSpec=s.value;applySpecDay(au.day,au.dayTrack,s.value);}break;}
+    case 'dayspecclr':applySpecDay(au.day,au.dayTrack,'');break;
+    case 'sjadd':{const n=$('sj-name').value.trim();if(!n)break;if(A.subjects.some(x=>x.name===n)){toast('이미 있는 과목');break;}A.subjects.push({id:uid(),name:n});saveA();renderAM();renderA();const f=$('sj-name');f&&f.focus();break;}
+    case 'sjup':{const i=A.subjects.findIndex(x=>x.id===t.dataset.id);if(i>0){[A.subjects[i-1],A.subjects[i]]=[A.subjects[i],A.subjects[i-1]];saveA();renderAM();renderA();}break;}
+    case 'sjdel':{const id=t.dataset.id;A.subjects=A.subjects.filter(x=>x.id!==id);Object.keys(A.spec).forEach(k=>{A.spec[k]=A.spec[k].map(x=>x===id?'':x);if(!A.spec[k].some(Boolean))delete A.spec[k];});au.arm=null;saveA();renderAM();renderA();toast('과목을 지웠어요');break;}
+    case 'sjdef':{const have=new Set(A.subjects.map(x=>x.id));defSubjects().forEach(x=>{if(!have.has(x.id))A.subjects.push(x);});saveA();renderAM();renderA();toast('빠진 기본 과목을 채웠어요');break;}
     case 'apoff':{const k=$('act-kind').value;au.lastKind=k;applyOff(k,$('act-name').value.trim());break;}
     case 'cloff':clearOff();break;
     case 'clsel':au.sel.clear();paintSel();renderActBar();break;
@@ -2984,7 +3071,7 @@ document.addEventListener('click',e=>{
     case 'stuf':au.stuF=v;renderAM();break;
     case 'tadd':{const n=$('t-name').value.trim();if(!n)break;if(A.tracks.some(x=>x.name===n)){toast('이미 있는 직종');break;}A.tracks.push({id:uid(),name:n});saveA();renderAM();renderA();const f=$('t-name');f&&f.focus();break;}
     case 'tup':{const i=A.tracks.findIndex(x=>x.id===t.dataset.id);if(i>0){[A.tracks[i-1],A.tracks[i]]=[A.tracks[i],A.tracks[i-1]];saveA();renderAM();renderA();}break;}
-    case 'tdel':{const id=t.dataset.id,gone=new Set(A.students.filter(s=>s.track===id).map(s=>s.id));A.tracks=A.tracks.filter(x=>x.id!==id);A.students=A.students.filter(s=>s.track!==id);A.offs=A.offs.filter(o=>o.track!==id);Object.keys(A.lect).forEach(k=>{if(k.split('|')[1]===id)delete A.lect[k];});Object.keys(A.att).forEach(k=>{if(gone.has(k.split('|')[1]))delete A.att[k];});au.arm=null;saveA();renderAM();renderA();toast('직종을 지웠어요');break;}
+    case 'tdel':{const id=t.dataset.id,gone=new Set(A.students.filter(s=>s.track===id).map(s=>s.id));A.tracks=A.tracks.filter(x=>x.id!==id);A.students=A.students.filter(s=>s.track!==id);A.offs=A.offs.filter(o=>o.track!==id);Object.keys(A.lect).forEach(k=>{if(k.split('|')[1]===id)delete A.lect[k];});Object.keys(A.spec).forEach(k=>{if(k.split('|')[1]===id)delete A.spec[k];});Object.keys(A.att).forEach(k=>{if(gone.has(k.split('|')[1]))delete A.att[k];});au.arm=null;saveA();renderAM();renderA();toast('직종을 지웠어요');break;}
     case 'sadd':{const nm=$('n-name').value.trim(),er=$('s-err');if(!nm){er.textContent='이름 필요';break;}
       const s={id:uid(),name:nm,track:$('n-track').value,no:String(A.students.filter(x=>x.track===$('n-track').value).length+1),admit:$('n-admit').value,complete:$('n-complete').value,commute:$('n-commute').value,dorm:$('n-dorm').value,cnp:$('n-cnp').value,memo:''};
       if(s.complete&&s.admit&&s.complete<s.admit){er.textContent='수료일이 입학일보다 빨라요';break;}
@@ -3042,11 +3129,12 @@ $('amodal').addEventListener('input',e=>{
   if(t.dataset.sid&&t.dataset.f&&t.tagName==='INPUT'&&t.type!=='date'){const x=A.students.find(q=>q.id===t.dataset.sid);if(x){x[t.dataset.f]=t.value;saveA();}return;}
   if(t.dataset.on){const o=A.offs.find(q=>q.id===t.dataset.on);if(o){o.name=t.value;saveA();}return;}
   if(t.dataset.kn){const k=A.kinds.find(q=>q.id===t.dataset.kn);if(k){k.name=t.value;saveA();}return;}
+  if(t.dataset.sjn){const x=A.subjects.find(q=>q.id===t.dataset.sjn);if(x){x.name=t.value;saveA();renderA();}return;}
 });
 $('amodal').addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.sid&&t.dataset.f&&(t.tagName==='SELECT'||t.type==='date')){const x=A.students.find(q=>q.id===t.dataset.sid);if(x){x[t.dataset.f]=t.value;saveA();renderAM();renderA();}return;}
-  if(t.dataset.sid||t.dataset.lid||t.dataset.on||t.dataset.kn||t.dataset.tn){renderA();return;}
+  if(t.dataset.sid||t.dataset.lid||t.dataset.on||t.dataset.kn||t.dataset.tn||t.dataset.sjn){renderA();return;}
   if(t.dataset.kc){const k=A.kinds.find(q=>q.id===t.dataset.kc);if(k){k.color=t.value;saveA();renderA();}return;}
   if(t.dataset.kx){const k=A.kinds.find(q=>q.id===t.dataset.kx);if(k){k.noClass=t.checked;saveA();renderAM();renderA();}return;}
   if(t.dataset.ps!=null||t.dataset.pe!=null){const i=+(t.dataset.ps??t.dataset.pe);A.periods[i][t.dataset.ps!=null?'s':'e']=t.value;saveA();renderA();return;}
@@ -3069,7 +3157,7 @@ document.addEventListener('keydown',e=>{
     if(au.modal){e.preventDefault();closeAM();return;}if(au.sel.size){au.sel.clear();paintSel();renderActBar();}return;}
   if(au.modal&&e.key==='Tab'){const f=[...$('amodal').querySelectorAll('button,a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(x=>!x.disabled&&x.offsetParent!==null);if(f.length){const a=f[0],z=f[f.length-1];if(e.shiftKey&&(document.activeElement===a||!$('amodal').contains(document.activeElement))){e.preventDefault();z.focus();}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus();}}return;}
   if(au.modal&&e.target.getAttribute('role')==='tab'){const ts=[...$('amodal').querySelectorAll('[role=tab]')],i=ts.indexOf(e.target),j={ArrowLeft:i-1,ArrowRight:i+1,Home:0,End:ts.length-1}[e.key];if(j!=null){e.preventDefault();const n=ts[(j+ts.length)%ts.length];au.tab=n.dataset.v;renderAM();const nt=$('atab-'+au.tab);nt&&nt.focus();}return;}
-  if(au.modal&&e.key==='Enter'&&!e.isComposing){const id=e.target.id;const map={'t-name':'tadd','n-name':'sadd','l-name':'ladd','k-name':'kadd'};if(map[id]){e.preventDefault();const b=$('amodal').querySelector('[data-a="'+map[id]+'"]');b&&b.click();}return;}
+  if(au.modal&&e.key==='Enter'&&!e.isComposing){const id=e.target.id;const map={'t-name':'tadd','n-name':'sadd','l-name':'ladd','k-name':'kadd','sj-name':'sjadd'};if(map[id]){e.preventDefault();const b=$('amodal').querySelector('[data-a="'+map[id]+'"]');b&&b.click();}return;}
   if(!au.modal&&e.target.classList&&e.target.classList.contains('cell')&&e.target.dataset.k){
     if(e.key==='Enter'||e.key===' '){e.preventDefault();e.target.click();return;}
     const mv={ArrowLeft:-1,ArrowRight:1,ArrowUp:-5,ArrowDown:5}[e.key];
