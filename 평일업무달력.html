@@ -680,10 +680,10 @@ const tip=(t,r)=>{const id='tip-'+(++tipN);return '<button type="button" class="
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const DOW='일월화수목금토';
 const uid=()=>Math.random().toString(36).slice(2,10);
-const MONTHS=Array.from({length:14},(_,i)=>({y:2026+Math.floor((10+i)/12),m:(10+i)%12}));
-const RMIN='2026-11-01',RMAX='2027-12-31',RLAB='2026.11 – 2027.12';
+const MONTHS=Array.from({length:15},(_,i)=>({y:2026+Math.floor((10+i)/12),m:(10+i)%12}));
+const RMIN='2026-11-01',RMAX='2028-01-31',RLAB='2026.11 – 2028.01';
 const FONT='"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Noto Sans KR",sans-serif';
-/* 법정 공휴일 (2026.11 – 2027.12) · 출석 달력과 같이 씀 (window.KR_HOLIDAYS) */
+/* 법정 공휴일 (2026.11 – 2028.01) · 출석 달력과 같이 씀 (window.KR_HOLIDAYS) */
 const HOLIDAYS=window.KR_HOLIDAYS={
  '2026-12-25':'성탄절','2027-01-01':'신정',
  '2027-02-06':'설날 연휴','2027-02-07':'설날','2027-02-08':'설날 연휴','2027-02-09':'대체공휴일(설날)',
@@ -694,8 +694,16 @@ const HOLIDAYS=window.KR_HOLIDAYS={
  '2027-09-14':'추석 연휴','2027-09-15':'추석','2027-09-16':'추석 연휴',
  '2027-10-03':'개천절','2027-10-04':'대체공휴일(개천절)',
  '2027-10-09':'한글날','2027-10-11':'대체공휴일(한글날)',
- '2027-12-25':'성탄절','2027-12-27':'대체공휴일(성탄절)'
+ '2027-12-25':'성탄절','2027-12-27':'대체공휴일(성탄절)',
+ '2028-01-01':'신정'
 };
+/* 2027 확정 일정 (FIXED-2027.md 와 같이 고침) · 두 달력이 같이 씀 */
+const FIXED=window.KR_FIXED=[
+ {id:'fx-win26',from:'2026-12-21',to:'2027-01-08',kind:'vac',name:'동계 방학',note:'바뀔 수 있음'},
+ {id:'fx-sum27',from:'2027-07-19',to:'2027-08-20',kind:'vac',name:'하계 방학',note:'바뀔 수 있음'},
+ {id:'fx-win27',from:'2027-12-20',to:'2028-01-14',kind:'vac',name:'동계 방학',note:'바뀔 수 있음'},
+ {id:'fx-found',from:'2027-09-01',to:'2027-09-01',kind:'closed',name:'공단 창립기념일',note:''}
+];
 const TODAY=K(new Date());
 const KEY='weekday-cal-v1';
 
@@ -755,7 +763,7 @@ function normalize(s){
   const st=Object.assign({},DEF_STYLE,s.style||{}),wp=Object.assign({},DEF_WP,s.wp||{});
   if(+st.fontSize===13)st.fontSize=14;if(wp.bg==='#1f2a36')wp.bg=DEF_WP.bg;if(wp.hol==='#ff7b72'||wp.hol==='#dc5000')wp.hol=DEF_WP.hol;
   return {items:Array.isArray(s.items)?s.items.filter(i=>i&&i.id&&i.due).map(i=>Object.assign({title:'',start:'',status:'todo',priority:'normal',assignees:[],tags:[],memo:'',checklist:[],links:[]},i)):[],
-    customs:Array.isArray(s.customs)?s.customs.filter(c=>c&&c.date):[],disabledHol:Array.isArray(s.disabledHol)?s.disabledHol:[],
+    customs:Array.isArray(s.customs)?s.customs.filter(c=>c&&c.date):[],disabledHol:Array.isArray(s.disabledHol)?s.disabledHol:[],disabledFixed:Array.isArray(s.disabledFixed)?s.disabledFixed.filter(v=>FIXED.some(f=>f.id===v)):[],
     style:st,wp:wp,tagColors:(s.tagColors&&typeof s.tagColors==='object')?s.tagColors:{},
     tagWeights:(s.tagWeights&&typeof s.tagWeights==='object')?Object.fromEntries(Object.entries(s.tagWeights).filter(([,v])=>v==='strong'||v==='normal'||v==='ref')):{},
     tagDone:(s.tagDone&&typeof s.tagDone==='object')?Object.fromEntries(Object.entries(s.tagDone).filter(([,v])=>v==='on'||v==='off')):{},
@@ -830,6 +838,7 @@ function weeksOf(y,m){
   d=w===6?addD(d,2):w===0?addD(d,1):addD(d,-(w-1));
   const out=[];while(d<=last){out.push([0,1,2,3,4].map(i=>addD(d,i)));d=addD(d,7);}return out;
 }
+const fixRange=f=>{const a=P(f.from),b=P(f.to);return a.getFullYear()+'. '+(a.getMonth()+1)+'/'+a.getDate()+(f.to!==f.from?' – '+(b.getFullYear()!==a.getFullYear()?b.getFullYear()+'. ':'')+(b.getMonth()+1)+'/'+b.getDate():'');};
 const holOn=k=>HOLIDAYS[k]&&!S.disabledHol.includes(k)?HOLIDAYS[k]:null;
 function dayInfo(k){
   const d=P(k),w=d.getDay(),notes=[];
@@ -838,6 +847,7 @@ function dayInfo(k){
     if(w===5)chk(addD(d,1),'토');
     if(w===1)chk(addD(d,-1),'일');
   }
+  if(w>=1&&w<=5)FIXED.forEach(f=>{if(f.from<=k&&k<=f.to&&!S.disabledFixed.includes(f.id))notes.push({t:f.name,f:1});});
   return {hol:holOn(k),customs:S.customs.filter(c=>c.date===k),notes};
 }
 const PR={high:0,normal:1,low:2};
@@ -1279,7 +1289,7 @@ function renderModal(){
   }
   if(ui.modal==='full'){
     md.className='modal wide';WL={};
-    let h=head('전체 보기 <span class="meta" style="font-weight:400">2026년 11월 – 2027년 12월 · 날짜를 누르면 그 달로 이동</span>')+'<div class="mb" id="fullb">';
+    let h=head('전체 보기 <span class="meta" style="font-weight:400">2026년 11월 – 2028년 1월 · 날짜를 누르면 그 달로 이동</span>')+'<div class="mb" id="fullb">';
     MONTHS.forEach((m,idx)=>{
       const pre=m.y+'-'+pad(m.m+1);const n=S.items.filter(i=>i.due.startsWith(pre)&&visible(i)).length;
       const hols=Object.keys(HOLIDAYS).filter(k=>k.startsWith(pre)&&holOn(k)).length;
@@ -1309,6 +1319,8 @@ function tabDays(){
   });
   h+='</div><div class="blk"><h4>기본 공휴일</h4><p class="help">월력요항 기준 '+tip('회사가 쉬지 않는 날은 꺼 두세요\n토·일과 겹친 공휴일은 금·월요일 칸에 작게 표시돼요')+'</p>';
   Object.keys(HOLIDAYS).forEach(k=>{const w=P(k).getDay();h+='<label class="lrow"><input type="checkbox" id="hol-'+k+'" data-hol="'+k+'"'+(S.disabledHol.includes(k)?'':' checked')+'><span class="d">'+fmtD(k)+'</span><span class="nm">'+esc(HOLIDAYS[k])+(w===0||w===6?' <span class="meta">(주말)</span>':'')+'</span></label>';});
+  h+='</div><div class="blk"><h4>확정 일정</h4><p class="help">방학 · 휴업일 '+tip('날짜 칸에 이름이 작게 표시돼요 (평일만)\n바뀐 일정은 꺼 두세요')+'</p>';
+  FIXED.forEach(f=>{h+='<label class="lrow"><input type="checkbox" id="fx-'+f.id+'" data-fx="'+f.id+'"'+(S.disabledFixed.includes(f.id)?'':' checked')+'><span class="d">'+esc(fixRange(f))+'</span><span class="nm">'+esc(f.name)+(f.note?' <span class="meta">'+esc(f.note)+'</span>':'')+'</span></label>';});
   return h+'</div>';
 }
 const SWN=['세이지','머스터드','라일락','로즈','샌드'],koS=(a,b)=>a.localeCompare(b,'ko');
@@ -1898,7 +1910,7 @@ document.addEventListener('click',e=>{
    case 'armimp':{if(!$('bk-in').value.trim()){$('bk-err').textContent='백업 파일이나 내용 필요';break;}ui.pendingImp=$('bk-in').value;ui.arm='imp';renderModal();$('bk-in').value=ui.pendingImp;break;}
    case 'imp':{try{const s=JSON.parse(ui.pendingImp||$('bk-in').value);if(!s||!Array.isArray(s.items))throw 0;S=normalize(s);save();applyStyle();ui.sel=null;ui.arm=null;renderAll();renderModal();toast('불러왔어요 · 항목 '+S.items.length+'개');}catch(err){ui.arm=null;renderModal();$('bk-err').textContent='백업 형식이 아니에요';}break;}
    case 'armreset':ui.arm='reset';renderModal();break;
-   case 'reset':S={items:[],customs:[],disabledHol:[],style:Object.assign({},DEF_STYLE),wp:Object.assign({},DEF_WP),tagColors:{},tagWeights:{},tagDone:{},kw:{},syn:normSyn()};applySyn();ui.sel=null;ui.arm=null;save();applyStyle();renderAll();renderModal();toast('모두 지웠어요');break;
+   case 'reset':S={items:[],customs:[],disabledHol:[],disabledFixed:[],style:Object.assign({},DEF_STYLE),wp:Object.assign({},DEF_WP),tagColors:{},tagWeights:{},tagDone:{},kw:{},syn:normSyn()};applySyn();ui.sel=null;ui.arm=null;save();applyStyle();renderAll();renderModal();toast('모두 지웠어요');break;
   }
 });
 function submitQA(){
@@ -1994,6 +2006,7 @@ $('modal').addEventListener('change',e=>{
   if(t.dataset.trn!=null){const m=renameTag(t.dataset.trn,t.value);if(m){save();setTimeout(()=>{renderAll();renderModal();},0);toast(m);}else setTimeout(renderModal,0);return;}
   if(t.dataset.co){const c=S.customs.find(q=>q.id===t.dataset.co);if(c)c.off=t.checked;}
   else if(t.dataset.hol){const k=t.dataset.hol;S.disabledHol=S.disabledHol.filter(x=>x!==k);if(!t.checked)S.disabledHol.push(k);}
+  else if(t.dataset.fx){const k=t.dataset.fx;S.disabledFixed=S.disabledFixed.filter(x=>x!==k);if(!t.checked)S.disabledFixed.push(k);}
   else if(t.dataset.so){S.style[t.dataset.so]=+t.value;applyStyle();}
   else if(t.dataset.sb){S.style[t.dataset.sb]=t.checked;}
   else if(t.dataset.sk){renderModal();}
@@ -2128,11 +2141,11 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const $=id=>document.getElementById(id);
 const uid=()=>Math.random().toString(36).slice(2,10);
 const DOW='일월화수목금토';
-const HOL=window.KR_HOLIDAYS||{};
+const HOL=window.KR_HOLIDAYS||{},FIX=window.KR_FIXED||[];
 const TODAY=K(new Date());
 const AKEY='attend-cal-v1',MKEY='cal-mode';
-const AMIN='2026-12-01',AMAX='2027-12-31',ALAB='2026.12 – 2027.12';
-const AM=Array.from({length:13},(_,i)=>({y:2026+Math.floor((11+i)/12),m:(11+i)%12}));
+const AMIN='2026-12-01',AMAX='2028-01-31',ALAB='2026.12 – 2028.01';
+const AM=Array.from({length:14},(_,i)=>({y:2026+Math.floor((11+i)/12),m:(11+i)%12}));
 const ymOf=m=>m.y+'-'+pad(m.m+1);
 const MON_EN=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
 const ST=['출석','유고결석','무단결석','지각','조퇴','결과'];
@@ -2150,7 +2163,7 @@ const isWk=k=>{const w=P(k).getDay();return w===0||w===6;};
 const pct=v=>v==null?'–':(Math.round(v*1000)/10)+'%';
 
 /* ---------- state ---------- */
-function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map(([s,e])=>({s,e})),kinds:defKinds(),offs:[],lect:{},att:{},disabledHol:[]};}
+function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map(([s,e])=>({s,e})),kinds:defKinds(),offs:[],lect:{},att:{},disabledHol:[],disabledFixed:[]};}
 /* 불러온 데이터 검증: id·날짜·교시·색은 형식이 맞는 것만 (HTML 속성에 들어가므로) */
 const ID_RE=/^[A-Za-z0-9_-]{1,40}$/,DATE_RE=/^\d{4}-\d{2}-\d{2}$/,TIME_RE=/^\d{2}:\d{2}$/,HEX_RE=/^#[0-9a-fA-F]{6}$/;
 const okId=v=>typeof v==='string'&&ID_RE.test(v),okDate=v=>typeof v==='string'&&DATE_RE.test(v)?v:'',str=v=>v==null?'':String(v).slice(0,200);
@@ -2171,7 +2184,7 @@ function normA(s){
     periods:arr(s.periods).length===NP?s.periods.map((p,i)=>({s:p&&TIME_RE.test(p.s)?p.s:DEF_P[i][0],e:p&&TIME_RE.test(p.e)?p.e:DEF_P[i][1]})):f.periods,
     kinds:kinds.length?kinds:f.kinds,
     offs:arr(s.offs).filter(o=>hasId(o)&&okDate(o.from)).map(o=>({id:o.id,from:o.from,to:okDate(o.to),kind:okId(o.kind)?o.kind:'event',name:str(o.name),track:tid(o.track),periods:okPs(o.periods),...(o.ex?{ex:true}:{})})),
-    lect,att,disabledHol:arr(s.disabledHol).filter(v=>typeof v==='string'&&DATE_RE.test(v)),ex:!!s.ex
+    lect,att,disabledHol:arr(s.disabledHol).filter(v=>typeof v==='string'&&DATE_RE.test(v)),disabledFixed:arr(s.disabledFixed).filter(v=>FIX.some(f=>f.id===v)),ex:!!s.ex
   };
 }
 function loadA(){try{const r=localStorage.getItem(AKEY);if(r)return normA(JSON.parse(r));}catch(e){}return freshA();}
@@ -2188,6 +2201,7 @@ function fixTrack(){const gone=id=>id&&!A.tracks.some(t=>t.id===id);if(gone(au.t
 const SC=new Map();
 const holOn=k=>HOL[k]&&!A.disabledHol.includes(k)?HOL[k]:null;
 const kindOf=o=>A.kinds.find(x=>x.id===o.kind)||{id:'?',name:'기타',noClass:false,color:KC[4]};
+const fixKind=f=>A.kinds.find(x=>x.id===f.kind)||defKinds().find(x=>x.id===f.kind)||{id:'?',name:'기타',noClass:true,color:KC[4]};
 const offCovers=(o,p)=>!o.periods||!o.periods.length||o.periods.includes(p);
 /* 그날(k) 그 직종(tid)의 수업 교시. tid='' 은 "전체" — 모든 직종 공통 특이사항만 적용 */
 function sched(k,tid){
@@ -2204,6 +2218,7 @@ function sched(k,tid){
           if(kd.noClass){if(!o.periods||!o.periods.length){ps=[];if(!r.why)r.why=o.name||kd.name;}else ps=ps.filter(p=>!o.periods.includes(p));}
         }
       });
+      FIX.forEach(f=>{if(f.from<=k&&k<=f.to&&!A.disabledFixed.includes(f.id)){r.labs.push({o:{id:f.id,from:f.from,to:f.to,kind:f.kind,name:f.name,track:'',periods:[],fx:1},kd:fixKind(f)});ps=[];if(!r.why)r.why=f.name;}});
       r.ps=ps;
     }
   }
@@ -2273,8 +2288,7 @@ function sampleA(){
     st('오세훈',2,'2026-12-01',{complete:'2027-06-30'}),st('윤가은',2,'2026-12-07',{dorm:'2027-01-04'})];
   s.students.forEach((x,i)=>x.no=String(i+1));
   const L=[{id:uid(),name:'김용석',subject:'특수용접',phone:'',memo:''},{id:uid(),name:'서지훈',subject:'전기안전',phone:'',memo:''},{id:uid(),name:'한미정',subject:'제빵 실습',phone:'',memo:''}];s.lecturers=L;
-  s.offs=[{id:uid(),from:'2027-01-25',to:'2027-02-05',kind:'vac',name:'겨울방학',track:'',periods:[]},
-    {id:uid(),from:'2026-12-11',to:'',kind:'self',name:'개별학습',track:T[0].id,periods:[]},
+  s.offs=[{id:uid(),from:'2026-12-11',to:'',kind:'self',name:'개별학습',track:T[0].id,periods:[]},
     {id:uid(),from:'2026-12-18',to:'',kind:'event',name:'안전교육',track:'',periods:[5,6]},
     {id:uid(),from:'2027-04-15',to:'',kind:'closed',name:'개교기념일',track:'',periods:[]}];
   weekdays('2026-12-01','2026-12-31').forEach((k,i)=>{
@@ -2553,7 +2567,7 @@ function mDays(){
   let h=headA('수업일 설정')+tabsA([['offs','특이사항 명부'],['kinds','특이사항 종류'],['periods','교시 시간'],['hol','법정 공휴일']])+'<div class="mb set">';
   if(au.tab==='kinds'){
     h+='<div class="blk"><h3>특이사항 종류</h3><p class="help">"수업 없음"을 켠 종류는 훈련소정일수에서 빠져요 '+tip('예) 방학·개별학습·자체 휴업일 → 수업 없음\n행사·특강처럼 수업은 하는 날 → 끔')+'</p>';
-    A.kinds.forEach(k=>{const used=A.offs.some(o=>o.kind===k.id);h+='<div class="lrow"><input type="color" id="kc-'+k.id+'" data-kc="'+k.id+'" value="'+esc(k.color)+'" aria-label="색"><input class="fi nm" id="kn-'+k.id+'" data-kn="'+k.id+'" value="'+esc(k.name)+'" aria-label="이름"><label class="chk"><input type="checkbox" id="kx-'+k.id+'" data-kx="'+k.id+'"'+(k.noClass?' checked':'')+'>수업 없음</label>'+(used?'<span class="meta">사용 중</span>':'<button class="ib" data-a="kdel" data-id="'+k.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
+    A.kinds.forEach(k=>{const used=A.offs.some(o=>o.kind===k.id)||FIX.some(f=>f.kind===k.id);h+='<div class="lrow"><input type="color" id="kc-'+k.id+'" data-kc="'+k.id+'" value="'+esc(k.color)+'" aria-label="색"><input class="fi nm" id="kn-'+k.id+'" data-kn="'+k.id+'" value="'+esc(k.name)+'" aria-label="이름"><label class="chk"><input type="checkbox" id="kx-'+k.id+'" data-kx="'+k.id+'"'+(k.noClass?' checked':'')+'>수업 없음</label>'+(used?'<span class="meta">사용 중</span>':'<button class="ib" data-a="kdel" data-id="'+k.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
     h+='<div class="form" style="margin-top:14px"><input class="fi" id="k-name" placeholder="새 종류 (예: 현장실습)" aria-label="새 종류" style="flex:1;min-width:160px"><label class="chk"><input type="checkbox" id="k-x" checked>수업 없음</label><button class="btn pri" data-a="kadd">추가</button></div></div>';
     return h+'</div>';
   }
@@ -2580,6 +2594,8 @@ function mDays(){
       h+='<tr><td>'+esc(fmtS(o.from)+(o.to&&o.to!==o.from?' – '+fmtS(o.to):''))+' <span class="meta">'+P(o.from).getFullYear()+'</span></td><td><span style="color:'+esc(kd.color)+'">●</span> '+esc(kd.name)+'</td><td><input class="fi" id="on-'+o.id+'" data-on="'+o.id+'" value="'+esc(o.name)+'" aria-label="이름"></td><td>'+(o.track?esc(trackName(o.track)):'전체')+'</td><td>'+(o.periods&&o.periods.length?o.periods.join('·'):'하루')+'</td><td class="r meta">'+(kd.noClass?'평일 '+n+'일 '+(o.periods&&o.periods.length?'교시 제외':'제외'):'수업함')+'</td><td><button class="ib" data-a="odel" data-id="'+o.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button></td></tr>';});
     h+='</tbody></table></div>';
   }
+  h+='</div><div class="blk"><h3>확정 일정</h3><p class="help">정해진 방학 · 휴업일, 전체 직종 수업 없음 '+tip('바뀐 일정은 꺼 두세요\n공휴일은 그대로 공휴일로 보여요')+'</p>';
+  FIX.forEach(f=>{const kd=fixKind(f),a=P(f.from),b=P(f.to);h+='<label class="lrow"><input type="checkbox" id="af-'+f.id+'" data-af="'+f.id+'"'+(A.disabledFixed.includes(f.id)?'':' checked')+'><span class="d">'+a.getFullYear()+'. '+fmtS(f.from)+(f.to!==f.from?' – '+(b.getFullYear()!==a.getFullYear()?b.getFullYear()+'. ':'')+fmtS(f.to):'')+'</span><span class="nm"><span style="color:'+esc(kd.color)+'">●</span> '+esc(f.name)+(f.note?' <span class="meta">'+esc(f.note)+'</span>':'')+'</span></label>';});
   return h+'</div></div>';
 }
 /* ---- 출결 분석 ---- */
@@ -2872,6 +2888,8 @@ function buildWorkbook(x){
     A.offs.slice().sort((p,q)=>p.from.localeCompare(q.from)).forEach(o=>{const kd=kindOf(o);r3.push([{v:o.from,s:'c'},{v:o.to||o.from,s:'c'},{v:kd.name,s:'l'},{v:o.name,s:'l'},{v:o.track?trackName(o.track):'전체',s:'l'},{v:o.periods&&o.periods.length?o.periods.join(','):'하루',s:'c'},{v:kd.noClass?'Y':'N',s:'c'}]);});
     r3.push([]);r3.push([{v:'법정 공휴일',s:'title'}]);r3.push(['날짜','이름','적용'].map(v=>({v,s:'h'})));
     Object.keys(HOL).filter(k=>k>=AMIN&&k<=AMAX).forEach(k=>r3.push([{v:k,s:'c'},{v:HOL[k],s:'l'},{v:A.disabledHol.includes(k)?'끔':'수업 없음',s:'c'}]));
+    r3.push([]);r3.push([{v:'확정 일정',s:'title'}]);r3.push(['시작','끝','종류','이름','적용'].map(v=>({v,s:'h'})));
+    FIX.forEach(f=>r3.push([{v:f.from,s:'c'},{v:f.to,s:'c'},{v:fixKind(f).name,s:'l'},{v:f.name,s:'l'},{v:A.disabledFixed.includes(f.id)?'끔':'수업 없음',s:'c'}]));
     sheets.push({name:'수업일 명부',rows:r3,fit:1,cols:[12,12,12,18,10,10,10]});
   }
   return sheets;
@@ -3032,6 +3050,7 @@ $('amodal').addEventListener('change',e=>{
   if(t.dataset.kc){const k=A.kinds.find(q=>q.id===t.dataset.kc);if(k){k.color=t.value;saveA();renderA();}return;}
   if(t.dataset.kx){const k=A.kinds.find(q=>q.id===t.dataset.kx);if(k){k.noClass=t.checked;saveA();renderAM();renderA();}return;}
   if(t.dataset.ps!=null||t.dataset.pe!=null){const i=+(t.dataset.ps??t.dataset.pe);A.periods[i][t.dataset.ps!=null?'s':'e']=t.value;saveA();renderA();return;}
+  if(t.dataset.af){const k=t.dataset.af;A.disabledFixed=A.disabledFixed.filter(x=>x!==k);if(!t.checked)A.disabledFixed.push(k);saveA();renderA();return;}
   if(t.dataset.ah){const k=t.dataset.ah;A.disabledHol=A.disabledHol.filter(x=>x!==k);if(!t.checked)A.disabledHol.push(k);saveA();renderA();return;}
   if(t.dataset.exs){au.exp.sh[t.dataset.exs]=t.checked?1:0;return;}
   if(t.id==='ex-from'){au.exp.from=+t.value;if(au.exp.to<au.exp.from)au.exp.to=au.exp.from;renderAM();return;}
