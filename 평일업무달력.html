@@ -504,7 +504,7 @@ button.wh:hover{background:var(--hover)}
 .pc.sel{background:var(--surface);outline:1px solid var(--fg);outline-offset:-3px}
 .pc .on{font-size:11px;font-weight:700}
 .pc .em{color:var(--faint)}
-.pc .sp,.ln.sp{color:var(--c1)}.pc .sp{font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:100%}.ln.sp b{color:inherit}
+.pc .sp{color:var(--c1);font-size:11px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;max-width:100%}.ln.sp b{font-weight:700}
 .dspec{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;font-size:13px}.dspec select.fi{width:auto;padding:5px 2px;font-size:13px}
 .wsum{padding:9px 12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .actbar{position:sticky;bottom:0;z-index:6;background:var(--bg);border-top:2px dashed var(--strong);padding:12px 0;margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px}
@@ -2236,7 +2236,8 @@ const MARK={출석:'○',유고결석:'유',무단결석:'무',지각:'지',조�
 const NP=6,PS=[1,2,3,4,5,6];
 const DEF_P=[['09:00','09:45'],['10:00','10:45'],['11:00','11:45'],['13:00','13:45'],['14:00','14:45'],['15:00','15:45']];
 const KC=['#a3c47a','#e6c95c','#c3a0e8','#e08fb6','#cdb79a'];
-const defSubjects=()=>[['sj-health','보건'],['sj-fire','소방재난예방'],['sj-labor','노동인권'],['sj-phys','물리&작업'],['sj-basic','직업기초'],['sj-support','훈련지원'],['sj-pe','특수체육'],['sj-social','사회성훈련']].map(([id,name])=>({id,name}));
+const SJC=['#a3c47a','#e6c95c','#8fb8e8','#c3a0e8','#e08fb6','#cdb79a'];/* 과목 색 팔레트: 초록·노랑·파랑·보라·분홍·탠(폴백) */
+const defSubjects=()=>[['sj-health','보건',SJC[1]],['sj-fire','소방재난예방',SJC[1]],['sj-labor','노동인권',SJC[1]],['sj-phys','물리&작업',SJC[3]],['sj-basic','직업기초',SJC[0]],['sj-support','훈련지원',SJC[0]],['sj-pe','특수체육',SJC[4]],['sj-social','사회성훈련',SJC[2]]].map(([id,name,color])=>({id,name,color}));
 const defKinds=()=>[{id:'vac',name:'방학',noClass:true,color:KC[2]},{id:'self',name:'개별학습',noClass:true,color:KC[0]},{id:'closed',name:'자체 휴업일',noClass:true,color:KC[3]},{id:'event',name:'행사·특강',noClass:false,color:KC[1]}];
 let tipN=0;
 const tip=(t,r)=>{const id='atip-'+(++tipN);return '<button type="button" class="ti'+(r?' r':'')+'" aria-label="도움말" aria-describedby="'+id+'"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg><span class="tt" role="tooltip" id="'+id+'">'+esc(t)+'</span></button>';};
@@ -2260,7 +2261,7 @@ function normA(s){
   const kinds=arr(s.kinds).filter(hasId).map(k=>({id:k.id,name:str(k.name),noClass:!!k.noClass,color:HEX_RE.test(k.color)?k.color:KC[4]}));
   const students=arr(s.students).filter(hasId).map(x=>({id:x.id,name:str(x.name),track:tid(x.track),no:str(x.no),admit:okDate(x.admit),complete:okDate(x.complete),commute:x.commute==='N'?'N':'Y',dorm:okDate(x.dorm),cnp:x.cnp==='Y'?'Y':'N',memo:str(x.memo),...(x.ex?{ex:true}:{})}));
   const lect={};Object.entries(obj(s.lect)).forEach(([k,v])=>{const [d,t]=k.split('|');if(!DATE_RE.test(d)||!tid(t)||!Array.isArray(v))return;const a=Array.from({length:NP},(_,i)=>okId(v[i])?v[i]:'');if(a.some(Boolean))lect[k]=a;});
-  const subjects=Array.isArray(s.subjects)?arr(s.subjects).filter(hasId).filter((x,i,l)=>l.findIndex(y=>y.id===x.id)===i).map(x=>({id:x.id,name:str(x.name),...(HEX_RE.test(x.color)?{color:x.color}:{})})):defSubjects();
+  const subjects=Array.isArray(s.subjects)?arr(s.subjects).filter(hasId).filter((x,i,l)=>l.findIndex(y=>y.id===x.id)===i).map(x=>({id:x.id,name:str(x.name),color:HEX_RE.test(x.color)?x.color:((defSubjects().find(d=>d.id===x.id)||{}).color||SJC[5])})):defSubjects();
   const subIds=new Set(subjects.map(x=>x.id)),spec={};
   Object.entries(obj(s.spec)).forEach(([k,v])=>{const [d,t]=k.split('|');if(!DATE_RE.test(d)||!tid(t)||!Array.isArray(v))return;const a=Array.from({length:NP},(_,i)=>okId(v[i])&&subIds.has(v[i])?v[i]:'');if(a.some(Boolean))spec[k]=a;});
   const sids=new Set(students.map(x=>x.id)),att={};
@@ -2316,6 +2317,7 @@ const isDorm=(s,k)=>s.dorm?k>=s.dorm:s.commute==='N';
 const trackName=id=>{const t=A.tracks.find(x=>x.id===id);return t?t.name:'(직종 없음)';};
 const lectName=id=>{const l=A.lecturers.find(x=>x.id===id);return l?l.name:'';};
 const subjName=id=>{const x=A.subjects.find(q=>q.id===id);return x?x.name:'';};
+const subjColor=id=>{const x=A.subjects.find(q=>q.id===id);return x&&x.color?x.color:SJC[5];};
 const stuSorted=tid=>{const ord={};A.tracks.forEach((t,i)=>ord[t.id]=i);return A.students.filter(s=>!tid||s.track===tid).sort((a,b)=>((ord[a.track]??99)-(ord[b.track]??99))||(a.no||'').localeCompare(b.no||'',undefined,{numeric:true})||a.name.localeCompare(b.name,'ko'));};
 /* 하루 출결 판정: 50% 미만 출석이면 지각·조퇴·결과도 결석 */
 function evalDay(s,k){
@@ -2489,9 +2491,9 @@ function acell(d,inMonth){
   if(sc.ps.length){
     if(sc.ps.length<NP)h+='<div class="ln">수업 '+sc.ps.length+'교시</div>';
     if(tid){lectRuns(k,tid).forEach(r=>{h+='<div class="ln"><b>'+esc(lectName(r.lid))+'</b> '+runTxt(r)+'</div>';});
-      const sr=specRuns(k,tid);if(sr.length){const full=sr.length===1&&sr[0].a===sc.ps[0]&&sr[0].b===sc.ps[sc.ps.length-1];const tt='특별 수업 '+sr.map(r=>subjName(r.lid)+' '+runTxt(r)).join(', ');h+='<div class="ln sp" title="'+esc(tt)+'">특별 <b>'+esc(sr.map(r=>subjName(r.lid)).filter((v,i,l)=>l.indexOf(v)===i).join(', '))+'</b>'+(full?'':' '+esc(sr.map(runTxt).join(' ')))+'</div>';}}
+      const sr=specRuns(k,tid);if(sr.length){const full=sr.length===1&&sr[0].a===sc.ps[0]&&sr[0].b===sc.ps[sc.ps.length-1];const tt='특별 수업 '+sr.map(r=>subjName(r.lid)+' '+runTxt(r)).join(', ');h+='<div class="ln sp" title="'+esc(tt)+'">특별 '+sr.map(r=>r.lid).filter((v,i,l)=>l.indexOf(v)===i).map(id=>'<b style="color:'+esc(subjColor(id))+'">'+esc(subjName(id))+'</b>').join(', ')+(full?'':' '+esc(sr.map(runTxt).join(' ')))+'</div>';}}
     else{const ls=new Set(),ss=new Set();A.tracks.forEach(t=>{lectRuns(k,t.id).forEach(r=>ls.add(r.lid));specRuns(k,t.id).forEach(r=>ss.add(r.lid));});if(ls.size)h+='<div class="ln">강사 <b>'+esc([...ls].map(lectName).join(', '))+'</b></div>';
-      if(ss.size){const nm=[...ss].map(subjName);h+='<div class="ln sp" title="'+esc('특별 수업 '+nm.join(', '))+'">특별 <b>'+esc(nm.join(', '))+'</b></div>';}}
+      if(ss.size){const nm=[...ss].map(subjName);h+='<div class="ln sp" title="'+esc('특별 수업 '+nm.join(', '))+'">특별 '+[...ss].map(id=>'<b style="color:'+esc(subjColor(id))+'">'+esc(subjName(id))+'</b>').join(', ')+'</div>';}}
     h+=daySummary(k,tid);
   }else if(!sc.hol&&!sc.labs.length)h+='<div class="ln">수업 없음</div>';
   return h+'</div>';
@@ -2520,7 +2522,7 @@ function pcell(k,tid,p,di){
   const cls='pc'+(sc.hol?' hol':!inP?' no':'')+(au.sel.has(key)?' sel':'');
   let inner='';
   if(sc.hol)inner=p===1?esc(sc.hol):'';
-  else{if(ol)inner+='<span class="on" style="color:'+esc((sc.labs.find(x=>offCovers(x.o,p))||{kd:{color:''}}).kd.color)+'">'+esc(ol)+'</span>';if(sj&&subjName(sj))inner+='<span class="sp" title="특별 수업 '+esc(subjName(sj))+'">'+esc(subjName(sj))+'</span>';if(lid&&inP)inner+='<span>'+esc(lectName(lid))+'</span>';else if(inP&&!ol&&!sj)inner+='<span class="em">·</span>';}
+  else{if(ol)inner+='<span class="on" style="color:'+esc((sc.labs.find(x=>offCovers(x.o,p))||{kd:{color:''}}).kd.color)+'">'+esc(ol)+'</span>';if(sj&&subjName(sj))inner+='<span class="sp" style="color:'+esc(subjColor(sj))+'" title="특별 수업 '+esc(subjName(sj))+'">'+esc(subjName(sj))+'</span>';if(lid&&inP)inner+='<span>'+esc(lectName(lid))+'</span>';else if(inP&&!ol&&!sj)inner+='<span class="em">·</span>';}
   return '<button class="'+cls+'" data-pc="1" data-k="'+k+'" data-p="'+p+'" data-di="'+di+'" aria-pressed="'+au.sel.has(key)+'" aria-label="'+esc(fmtD(k)+' '+p+'교시'+(lid?' '+lectName(lid):'')+(sj&&subjName(sj)?' 특별 수업 '+subjName(sj):'')+(ol?' '+ol:'')+(inP?'':' 수업 없음'))+'">'+inner+'</button>';
 }
 function renderWeek(){
@@ -2705,7 +2707,7 @@ function mDays(){
     const use=id=>Object.entries(A.spec).reduce((t,[k,a])=>t+a.filter(x=>x===id).length,0);
     h+='<div class="blk"><h3>특별 수업 과목 '+A.subjects.length+'개</h3><p class="help">수업 있는 날 일반 수업 대신 들어가는 세부과목 '+tip('주 시간표·하루 창에서 직종·날짜별로 교시 단위 또는 하루 전체로 넣어요\n외부강사와는 따로 — 한 교시에 둘 다 넣을 수 있어요\n과목을 지우면 넣어 둔 특별 수업도 같이 빠져요')+'</p>';
     if(!A.subjects.length)h+='<div class="empty">과목 없음</div>';
-    A.subjects.forEach((x,i)=>{const n=use(x.id);h+='<div class="lrow"><span class="d">'+(i+1)+'</span><input class="fi nm" id="sjn-'+x.id+'" data-sjn="'+x.id+'" value="'+esc(x.name)+'" aria-label="과목 이름"><span class="meta">'+(n?n+'교시 사용':'')+'</span><button class="ib" data-a="sjup" data-id="'+x.id+'" aria-label="위로" title="위로"><svg class="i" style="transform:rotate(90deg)"><use href="#i-l"/></svg></button>'+(au.arm==='sj:'+x.id?'<button class="btn danger arm" data-a="sjdel" data-id="'+x.id+'">'+(n?n+'교시도 빼기':'삭제 확인')+'</button>':'<button class="ib" data-a="arm" data-v="sj:'+x.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
+    A.subjects.forEach((x,i)=>{const n=use(x.id);h+='<div class="lrow"><span class="d">'+(i+1)+'</span><input type="color" id="sjc-'+x.id+'" data-sjc="'+x.id+'" value="'+esc(subjColor(x.id))+'" aria-label="색"><input class="fi nm" id="sjn-'+x.id+'" data-sjn="'+x.id+'" value="'+esc(x.name)+'" aria-label="과목 이름"><span class="meta">'+(n?n+'교시 사용':'')+'</span><button class="ib" data-a="sjup" data-id="'+x.id+'" aria-label="위로" title="위로"><svg class="i" style="transform:rotate(90deg)"><use href="#i-l"/></svg></button>'+(au.arm==='sj:'+x.id?'<button class="btn danger arm" data-a="sjdel" data-id="'+x.id+'">'+(n?n+'교시도 빼기':'삭제 확인')+'</button>':'<button class="ib" data-a="arm" data-v="sj:'+x.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</div>';});
     h+='<div class="form" style="margin-top:14px"><input class="fi" id="sj-name" placeholder="새 과목 (예: 안전교육)" aria-label="새 과목" style="flex:1;min-width:160px"><button class="btn pri" data-a="sjadd">추가</button></div><div class="form" style="margin-top:10px"><button class="btn" data-a="sjdef">기본 과목으로 되돌리기</button></div></div>';
     return h+'</div>';
   }
@@ -2820,6 +2822,7 @@ const XL=(function(){
     hol:[4,3,1,'center',1],off:[3,6,1,'center',1],abs:[0,4,1,'center'],part:[0,5,1,'center'],lec:[5,7,1,'center',1],tot:[1,8,1,'center'],totn:[1,8,1,'right'],totpct:[1,8,1,'right',0,10],
     calh:[1,2,1,'left'],calhol:[4,3,1,'left'],low:[4,0,1,'right',0,10],sec:[1,7,1,'left'],small:[5,0,1,'center']};
   const XN=Object.keys(XF),XI={};XN.forEach((k,i)=>XI[k]=i);
+  const spX=hex=>{const k='sp'+hex;if(!(k in XF)){FILLS.push(fill(hex.slice(1).toUpperCase()));XF[k]=[5,FILLS.length-1,1,'center',1];XN.push(k);XI[k]=XN.length-1;}return k;};/* 특별 수업 과목 색 칸 */
   function stylesXML(){
     const xfs=XN.map(k=>{const [f,fi,b,h,w,nf,v]=XF[k];return '<xf numFmtId="'+(nf||0)+'" fontId="'+f+'" fillId="'+fi+'" borderId="'+b+'" xfId="0"'+(f?' applyFont="1"':'')+(fi?' applyFill="1"':'')+(b?' applyBorder="1"':'')+(nf?' applyNumberFormat="1"':'')+(h||w||v?' applyAlignment="1"><alignment'+(h?' horizontal="'+h+'"':'')+' vertical="'+(v||'center')+'"'+(w?' wrapText="1"':'')+'/></xf>':'/>');}).join('');
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="'+FONTS.length+'">'+FONTS.join('')+'</fonts><fills count="'+FILLS.length+'">'+FILLS.join('')+'</fills><borders count="'+BORDERS.length+'">'+BORDERS.join('')+'</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="'+XN.length+'">'+xfs+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
@@ -2863,7 +2866,7 @@ const XL=(function(){
     sheets.forEach((s,i)=>files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:sheetXML(s)}));
     return zip(files);
   }
-  return {book};
+  return {book,spX};
 })();
 
 /* ---------- 엑셀 시트 만들기 ---------- */
@@ -3011,7 +3014,7 @@ function buildWorkbook(x){
     let cnt=0;
     keys.forEach(key=>{const [k,tid]=key.split('|'),sc=sched(k,tid),arr=A.spec[key];let n=0;
       const row=[{v:k,s:'c'},{v:DOW[P(k).getDay()],s:'c'},{v:trackName(tid),s:'l'}];
-      PS.forEach(p=>{if(!sc.ps.includes(p)){row.push({v:'',s:'off'});return;}const nm=arr[p-1]?subjName(arr[p-1]):'';if(nm)n++;row.push({v:nm,s:nm?'lec':'c'});});
+      PS.forEach(p=>{if(!sc.ps.includes(p)){row.push({v:'',s:'off'});return;}const nm=arr[p-1]?subjName(arr[p-1]):'';if(nm)n++;row.push({v:nm,s:nm?XL.spX(subjColor(arr[p-1])):'c'});});
       if(!n)return;row.push({v:n,s:'n'});rows.push(row);cnt+=n;});
     if(rows.length===4)rows.push([{v:'넣은 특별 수업 없음',s:'note'}]);
     else rows.push([{v:'합계',s:'tot'},{v:'',s:'tot'},{v:'',s:'tot'}].concat(PS.map(()=>({v:'',s:'tot'})),[{v:cnt,s:'totn'}]));
@@ -3125,7 +3128,7 @@ document.addEventListener('click',e=>{
     case 'opensubj':openAM('days',{tab:'subj'});break;
     case 'dayspec':{const s=$('day-spec');if(s){au.lastSpec=s.value;applySpecDay(au.day,au.dayTrack,s.value);}break;}
     case 'dayspecclr':applySpecDay(au.day,au.dayTrack,'');break;
-    case 'sjadd':{const n=$('sj-name').value.trim();if(!n)break;if(A.subjects.some(x=>x.name===n)){toast('이미 있는 과목');break;}A.subjects.push({id:uid(),name:n});saveA();renderAM();renderA();const f=$('sj-name');f&&f.focus();break;}
+    case 'sjadd':{const n=$('sj-name').value.trim();if(!n)break;if(A.subjects.some(x=>x.name===n)){toast('이미 있는 과목');break;}A.subjects.push({id:uid(),name:n,color:SJC.find(c=>!A.subjects.some(x=>x.color===c))||SJC[5]});saveA();renderAM();renderA();const f=$('sj-name');f&&f.focus();break;}
     case 'sjup':{const i=A.subjects.findIndex(x=>x.id===t.dataset.id);if(i>0){[A.subjects[i-1],A.subjects[i]]=[A.subjects[i],A.subjects[i-1]];saveA();renderAM();renderA();}break;}
     case 'sjdel':{const id=t.dataset.id;A.subjects=A.subjects.filter(x=>x.id!==id);Object.keys(A.spec).forEach(k=>{A.spec[k]=A.spec[k].map(x=>x===id?'':x);if(!A.spec[k].some(Boolean))delete A.spec[k];});au.arm=null;saveA();renderAM();renderA();toast('과목을 지웠어요');break;}
     case 'sjdef':{const have=new Set(A.subjects.map(x=>x.id));defSubjects().forEach(x=>{if(!have.has(x.id))A.subjects.push(x);});saveA();renderAM();renderA();toast('빠진 기본 과목을 채웠어요');break;}
@@ -3216,6 +3219,7 @@ $('amodal').addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.sid&&t.dataset.f&&(t.tagName==='SELECT'||t.type==='date')){const x=A.students.find(q=>q.id===t.dataset.sid);if(x){x[t.dataset.f]=t.value;saveA();renderAM();renderA();}return;}
   if(t.dataset.sid||t.dataset.lid||t.dataset.on||t.dataset.kn||t.dataset.tn||t.dataset.sjn){renderA();return;}
+  if(t.dataset.sjc){const x=A.subjects.find(q=>q.id===t.dataset.sjc);if(x){x.color=t.value;saveA();renderA();}return;}
   if(t.dataset.kc){const k=A.kinds.find(q=>q.id===t.dataset.kc);if(k){k.color=t.value;saveA();renderA();}return;}
   if(t.dataset.kx){const k=A.kinds.find(q=>q.id===t.dataset.kx);if(k){k.noClass=t.checked;saveA();renderAM();renderA();}return;}
   if(t.dataset.ps!=null||t.dataset.pe!=null){const i=+(t.dataset.ps??t.dataset.pe);A.periods[i][t.dataset.ps!=null?'s':'e']=t.value;saveA();renderA();return;}
