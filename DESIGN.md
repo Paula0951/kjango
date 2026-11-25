@@ -79,6 +79,8 @@ Date markers (never a cream fill, so they can't be confused with urgent pills):
 - **Today** — 2px dashed cream frame around the whole cell + 2px ring on the (bold) day number + 11px `TODAY` + `#2a1a0c` tint + the weekday header (e.g. FRI 금) underlined. Earlier days of the month are dimmed (`past`: number `--strong`, chips 78%) so today is the brightest place on the screen.
 - **Holiday** — ember day number + ember label + `--hol-bg` cell.
 - **Custom day** — user color label (optional full-cell tint). New days default to `--c3`.
+- **Special class** (출석 달력 특별 수업) — green `--c1` bold 11px label (`.sp`) in week/day cells; month cell shows the name on one ellipsized line. Not a tag color.
+- **Fixed-schedule note** (확정 일정, 업무 달력) — muted small text in the weekday cell, no fill, never ember.
 - **Overdue** (a *task* that is not done, due < today — `needsDone(i)`; 일정·참고 items never go overdue) — `D+n` label in `--over` beside the chip, never dimmed by `past`; `지연 D+n` badge in the day modal; hero stat `지연 N` (all months, number in `--over`). Text always accompanies the color.
 
 **Completion model.** `needsDone(i)`: explicit `item.kind` (`task` | `event`) wins; otherwise the item's tags decide (`S.tagDone` on/off per tag, else 일정 keywords such as 회의·행사·휴가·참고 → event; no tag = task). Tasks get a real checkbox (`.cb`, `role=checkbox`, 20px + 3px hit pad) in day-modal and NEXT UP rows; events get a neutral `◇` and a 일정 badge, never `D+n`, never in the 지연 stat. Done keeps §3 level 3 (muted + strike; the checked box replaces the `✓` prefix on task rows).
@@ -169,7 +171,7 @@ Dark canvas; uppercase English month; `MON–FRI` header; hairline dashed grid (
 
 Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own storage key `attend-cal-v1`. The rail's **행정 / 출석** radio pair switches modes (remembered in `cal-mode`; `?mode=att` opens it directly). Admin handlers return early while `body[data-mode=att]`.
 
-**Range** 2026.12 – 2027.12 (the admin calendar now runs 2026.11 – 2027.12). Legal holidays live once in `window.KR_HOLIDAYS`; each calendar keeps its own on/off list.
+**Range** 2026.12 – 2028.01 (the admin calendar runs 2026.11 – 2028.01). Legal holidays live once in `window.KR_HOLIDAYS`; each calendar keeps its own on/off list.
 
 **Rules**
 - 훈련소정일수 = weekday, not a holiday, not covered by a "수업 없음" 특이사항, within the student's 입학–수료 dates. 6 periods/day (45 min, lunch 12–13), editable times.
@@ -188,6 +190,16 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
 **xlsx** written in-page (STORE zip + SpreadsheetML, inline strings, fixed style table) — no library, works offline. Sheets: 일별 교시 출결표 (per month, lecturer row per 직종), 일별 요약, 월별 통계, 누적 통계, 월별 출석률, 외부강사 달력 (per month + 강사별 시수), 강사 월별 시수, 수당 기초자료, 학생부·강사 명단·수업일 명부. Verify with `node tools/verify-attendance.js <dir>` and `node tools/verify-attendance-fixes.js`.
 
 ## 13. Changelog
+
+**v14 (fixed schedule · special classes)**
+1. **2027 확정 일정** (`window.KR_FIXED`, source `FIXED-2027.md`): 동계 방학 26.12.21–27.1.8, 하계 방학 27.7.19–8.20, 동계 방학 27.12.20–28.1.14, 공단 창립기념일 27.9.1.
+   - Attendance calendar: no class for all 직종 (holiday takes precedence).
+   - Work calendar: muted small note in weekday cells (no ember).
+   - Each item can be turned off in Settings (`disabledFixed`).
+2. **Both calendars extended to 2028.01**, with 2028-01-01 신정 added.
+3. **출석 달력 특별 수업 (세부과목):** 기본 8과목 (보건·소방재난예방·노동인권·물리&작업·직업기초·훈련지원·특수체육·사회성훈련). Set per 직종 and date, by 교시 or whole day; separate from 강사.
+   - Week/day cells: small green bold label (`.sp`, `--c1`). Month cell: 특별 과목명 on one line (ellipsis).
+   - Settings › 수업일 설정 › 특별 수업 tab; Excel 특별 수업 sheet.
 
 **v13 (tags · completion · ranges)**
 1. **Bare `!` means high priority.** `! 교육 증명서 제출` and `!교육…` at the start of the text both set high. A `!` glued to a word mid-title stays plain text. The `!` button toggles a leading `! `.
