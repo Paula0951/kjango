@@ -79,7 +79,7 @@ Date markers (never a cream fill, so they can't be confused with urgent pills):
 - **Today** — 2px dashed cream frame around the whole cell + 2px ring on the (bold) day number + 11px `TODAY` + `#2a1a0c` tint + the weekday header (e.g. FRI 금) underlined. Earlier days of the month are dimmed (`past`: number `--strong`, chips 78%) so today is the brightest place on the screen.
 - **Holiday** — ember day number + ember label + `--hol-bg` cell.
 - **Custom day** — user color label (optional full-cell tint). New days default to `--c3`.
-- **Special class** (출석 달력 특별 수업) — green `--c1` bold 11px label (`.sp`) in week/day cells; month cell shows the name on one ellipsized line. Not a tag color.
+- **Special class** (출석 달력 특별 수업) — per-subject user color (defaults: 직업기초·훈련지원 `#a3c47a`, 보건·소방재난예방·노동인권 `#e6c95c`, 사회성훈련 `#8fb8e8`, 물리&작업 `#c3a0e8`, 특수체육 `#e08fb6`; editable in settings) bold 11px label (`.sp`) in week/day cells; month cell shows each name in its color on one ellipsized line. Not a tag color.
 - **Fixed-schedule note** (확정 일정, 업무 달력) — muted small text in the weekday cell, no fill, never ember.
 - **Overdue** (a *task* that is not done, due < today — `needsDone(i)`; 일정·참고 items never go overdue) — `D+n` label in `--over` beside the chip, never dimmed by `past`; `지연 D+n` badge in the day modal; hero stat `지연 N` (all months, number in `--over`). Text always accompanies the color.
 
@@ -198,7 +198,7 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
    - Each item can be turned off in Settings (`disabledFixed`).
 2. **Both calendars extended to 2028.01**, with 2028-01-01 신정 added.
 3. **출석 달력 특별 수업 (세부과목):** 기본 8과목 (보건·소방재난예방·노동인권·물리&작업·직업기초·훈련지원·특수체육·사회성훈련). Set per 직종 and date, by 교시 or whole day; separate from 강사.
-   - Week/day cells: small green bold label (`.sp`, `--c1`). Month cell: 특별 과목명 on one line (ellipsis).
+   - Week/day cells: small bold label in the subject's color (`.sp`, inline style). Month cell: 특별 과목명 (each in its color) on one line (ellipsis).
    - Settings › 수업일 설정 › 특별 수업 tab; Excel 특별 수업 sheet.
 
 **v13 (tags · completion · ranges)**
