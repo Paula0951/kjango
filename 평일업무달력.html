@@ -3790,6 +3790,7 @@ document.addEventListener('keydown',e=>{
 window.KR_ATT_RESET=()=>{SC.clear();};
 window.KR_ATT={
   has:()=>A.tracks.length>0,
+  getA:()=>A,setA:o=>{A=normA(o);SC.clear();rerender();},
   /* 그날 수업·출결 한 줄 (HTML). 업무 칸의 쉬는 날 칩과 겹치는 이름(skip)은 뺀다 */
   dayLine(k,skip){
     if(!A.tracks.length)return '';
@@ -3834,7 +3835,7 @@ window.KR_BACKUP=(function(){
       if(kind==='v2'){
         if('fixed' in sh){p.fixed=W.normFixed(sh.fixed);if(!p.fixed)throw bad('공통 설정 형식 오류');}
         if('holOff' in sh){p.holOff=offList(sh.holOff);if(!p.holOff)throw bad('공통 설정 형식 오류');}
-      }else{p.fixed=W.fxParse(sh);p.holOff=offList(sh.disabledHol);}
+      }else{p.fixed=W.fxParse(sh);p.holOff=offList(sh.disabledHol);if(p.holOff&&!p.holOff.length)p.holOff=null;}/* 예전 파일의 빈 목록은 '없음'으로 (지금 설정을 지우지 않음) */
     }
     if(!p.work&&!p.att&&!p.fixed&&!p.holOff)throw bad('불러올 내용이 없어요');
     return p;
