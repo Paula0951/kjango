@@ -13,8 +13,8 @@
 2. **Structure = solid hairlines + fills.** Inner lines are 1px solid hairlines, panels are separated by elevation (fill), not lines (§4). The **only** dashed structural element is the grid's 2px outer stitch; otherwise dashes are reserved for transient states (drop target, selection, drag ghost, keyboard focus) and for the 참고-weight token shapes.
 3. **Say less in the UI.** Placeholders are short; explanations live behind an info icon (§7).
 4. **Warm, never pure — and not too bright.** Text `#e8d9c5` on walnut `#1a140f` (≈13.2:1; the old 17.3:1 cream-on-black caused halation). No `#fff` / `#000`. A soft ambient light sits behind everything (§2.1).
+5. **Ember is rare.** The ember family (`--ember`, `--hol-fg`, `--over`) is for holidays, overdue (`D+n`) and errors only — never buttons, selection, links or the today marker.
 6. **Today is cool.** `--now` slate blue is the only cool hue and means "now" — nothing else may use it.
-5. **Ember is rare.** Orange is only for holidays and errors.
 
 ## 2. Color tokens
 
@@ -38,6 +38,8 @@
 | `--frame` | fg 24% on bg | **Frame**: 1px solid outer containers (modal, mini grids, banners, token buttons) and the grid's dashed stitch |
 | `--today-bg` | `transparent` | Today cell tint (user-adjustable; default none) |
 | `--high-bg` / `--high-fg` | `#e3cfb3` / `--bg` | Urgent pill (one step below fg so it is no longer the brightest block) |
+| `--shadow` | `#000` | Shadow color of floating surfaces, mixed in at use: drawers 35%, modals 45% (v17; was hardcoded `rgb(0 0 0/…)`) |
+| `--scrim` | `--bg` 84% over transparent | Modal backdrop (`.ov`); follows a custom 배경 (v17) |
 | `--focus-tint` | `--surface` 35% on bg | Focused input background |
 | `--out` | `--surface` 30% on bg | (legacy) subtle row fill |
 | `--chip-h` | `--surface` 78% + fg | Primary button hover |
@@ -53,7 +55,7 @@ The canvas is not flat: `body{background:var(--amb),var(--bg);background-attachm
 
 Surfaces are translucent (`--glass`) so the light reads as *behind* the calendar; cells stay legible. Sticky bars (`.qa`, `.actbar`) paint the same fixed `--amb` so they never show a seam. Floating panels/modals are opaque `--raise`. Worst-case fg contrast over the brightest glow + rail glass ≈ 11.0:1 (8×8-px block average, 1440×900). The 배경화면 feature is a PNG *export* (not an in-app background), so the glow is always the in-app default; a custom 배경 color keeps the glow on top of it.
 
-Removed in v10 (were unused): `--chip`, `--accent`, `--accent-soft`, `--ok`, `--win`, `--warn` (use `--ember`). The modal scrim is `--bg` at 84%, never pure black.
+Removed in v10 (were unused): `--chip`, `--accent`, `--accent-soft`, `--ok`, `--win`, `--warn` (use `--ember`). The modal scrim (`--scrim`) is `--bg` at 84%, never pure black.
 
 ### Category colors (the only chroma besides holidays)
 
@@ -90,7 +92,7 @@ Rule: **solid cream fill is reserved for "urgent" only.** Everything else uses o
 | 1 | **Urgent** (중요도 높음, not done) | `--high-bg` (`#e3cfb3`) pill, dark text, `!` prefix. Always shown in the cell. Urgent **range bars** are *not* filled: fg 16% fill + 1px fg outline (3px end cap) |
 | 2 | **Active** | Cream text, tag dot |
 | 3 | **Done** | `--muted` text + 1.5px `--strong` strike-through + `✓` prefix (the ✓ is not struck) |
-| 4 | **Out-of-month** | Day number `--strong`; chips/“+N개 더” `--muted` |
+| 4 | **Out-of-month** | Day number `--strong`; chips/“+N개 더” `--muted`. An urgent pill keeps its `--high-bg`/`--high-fg` colors and is dimmed with `opacity:.72` (text ≈6.7:1 on the pill; v17 — `--muted` text on the cream pill was 1.7:1). Urgent range bars keep `--fg` text (≈8.8:1) |
 
 Date markers (never a cream fill, so they can't be confused with urgent pills):
 
@@ -98,7 +100,7 @@ Date markers (never a cream fill, so they can't be confused with urgent pills):
 - **Holiday** — ember day number + ember label + `--hol-bg` cell.
 - **Custom day** — user color label (optional full-cell tint). New days default to `--c3`.
 - **Special class** (출석 달력 특별 수업) — per-subject user color (defaults: 직업기초·훈련지원 `#a3c47a`, 보건·소방재난예방·노동인권 `#e6c95c`, 사회성훈련 `#8fb8e8`, 물리&작업 `#c3a0e8`, 특수체육 `#e08fb6`; editable in settings) bold 11px label (`.sp`) in week/day cells; month cell shows each name in its color on one ellipsized line. Not a tag color.
-- **Fixed-schedule note** (확정 일정, 업무 달력) — muted small text in the weekday cell, no fill, never ember.
+- **Calendar-settings note** (달력 설정 · 방학/휴업일, 업무 달력) — muted small text in the weekday cell, no fill, never ember.
 - **Overdue** (a *task* that is not done, due < today — `needsDone(i)`; 일정·참고 items never go overdue) — `D+n` label in `--over` beside the chip, never dimmed by `past`; `지연 D+n` badge in the day modal; hero stat `지연 N` (all months, number in `--over`). Text always accompanies the color.
 
 **Completion model.** `needsDone(i)`: explicit `item.kind` (`task` | `event`) wins; otherwise the item's tags decide (`S.tagDone` on/off per tag, else 일정 keywords such as 회의·행사·휴가·참고 → event; no tag = task). Tasks get a real checkbox (`.cb`, `role=checkbox`, 20px + 3px hit pad) in day-modal and NEXT UP rows; events get a neutral `◇` and a 일정 badge, never `D+n`, never in the 지연 stat. Done keeps §3 level 3 (muted + strike; the checked box replaces the `✓` prefix on task rows).
@@ -112,9 +114,9 @@ Minimum legibility: any item text ≥ `--muted` (≈ 66%). `--faint` is only for
 - **Hover (day cell)**: `--hover` fill only (no outline), contents lift 2px, `+` fades in. Motion only under `prefers-reduced-motion: no-preference`.
 - **Focus**: 2px dashed cream outline (transient state; inset on cells).
 - **Input focus**: `2px dashed --fg` underline + `--focus-tint` (textarea: 2px dashed frame; quick-add box via `:focus-within`).
-- **Keyboard**: cells are a roving-tabindex grid — arrows move day/week, Enter opens the day, PageUp/PageDown or Alt+←/→ change month (bare arrows never change month), Esc closes. Modals make the page `inert`, trap Tab, and restore focus on close; settings opens on its selected tab.
+- **Keyboard**: cells are a roving-tabindex grid — arrows move day/week, Enter opens the day, PageUp/PageDown (v17: from any focus, in both calendars — not while typing in an input/textarea/select, with a modal open or with a modifier held) or Alt+←/→ change month (bare arrows never change month), Esc closes. Modals make the page `inert`, trap Tab, and restore focus on close; settings opens on its selected tab.
 - **Focus restore**: re-renders restore focus by `id`/`data-*`. Opening an item focuses its title; closing the panel returns to the opener (chip / NEXT UP row), else the item's chip, else its day cell.
-- **A11y**: `aria-current="date"` on today, descriptive `aria-label` per cell and chip (title, 중요, status, 기한 지남), `aria-pressed` on toggles, toast is `aria-live`. ⓘ is `aria-describedby` → `<span role="tooltip">`; Esc on a focused/hovered ⓘ hides only the tooltip. Settings tabs are `tablist/tab/tabpanel` with ←/→/Home/End. Hit areas ≥ 24px (`::before{inset:-5px}` on 22px icons; checklist checkbox 18px by the spacing exception).
+- **A11y**: `#nav-filter` carries `aria-expanded` (+ `aria-controls="side"`), kept in sync by a MutationObserver on `#app` whatever closes the filter drawer; the 업무/출석 switch is a `radiogroup` with roving tabindex (only the checked radio is tabbable, ←/↑/→/↓ switch the calendar and move focus to the new calendar's radio; v17). `aria-current="date"` on today, descriptive `aria-label` per cell and chip (title, 중요, status, 기한 지남), `aria-pressed` on toggles, toast is `aria-live`. ⓘ is `aria-describedby` → `<span role="tooltip">`; Esc on a focused/hovered ⓘ hides only the tooltip. Settings tabs are `tablist/tab/tabpanel` with ←/→/Home/End. Hit areas ≥ 24px (`::before{inset:-5px}` on 22px icons; checklist checkbox 18px by the spacing exception).
 
 ## 4. Separators — solid hairlines, fills, one stitch
 
@@ -138,8 +140,8 @@ Dashes otherwise appear only in transient states: drop target (`.cdrop`, `.drop`
 
 ## 6. Components
 
-- **Rail** (grid column 176px; the rail's glass fill bleeds to the page's left edge: `margin-left:-28px`, padding `30px 16px 22px 28px` → 160px content). Top → bottom: brand (13px, .12em, 500) · 행정/출석 switch · **year month-picker** · nav list · bottom nav (`margin-top:auto`). No right border — the fill is the edge (plus a 1px fg-6% inset shadow).
-- **Month picker** (`window.MonthPicker(el,{months,sel,go,dot,dotLabel})`, one renderer shared by both calendars): header row 28px high — `‹` 28×28 icon button (radius 8, 14px chevron) · year label 13px/600 tabular · `›`; steps only between years that have months in range (disabled at the ends). Below, a 4×3 grid (`gap:4px`, cells ≈37×32px, radius 8) of `1월`…`12월` at 12px. States: enabled `--fg`; **selected** (shown month) `--surface` fill + weight 600 + `aria-current="true"`; **this month** `--now` text (both when selected); **out of range** (admin before 2026-11, attendance before 2026-12, after 2028-01) `disabled` + `--faint` at 55% opacity, not focusable; hover `--hover`. A 4px dot (`currentColor` 50%, 3px from the bottom) = density hint: work calendar → open (not done) items due that month; attendance → an active 방학·휴업일 (`KR_FIXED`) touches the month. The stepper year follows the shown month whenever it changes (‹ › in the hero, PgUp/PgDn, Alt+←/→, 오늘, clicking a month, week navigation in 주 시간표). Keyboard: the grid is one Tab stop (roving `tabindex`), ←/→ move between enabled months and roll over to the previous/next year, ↑/↓ move by a row, Home/End, PgUp/PgDn step the year, Enter/Space opens (focus stays on the month).
+- **Rail** (grid column 176px; the rail's glass fill bleeds to the page's left edge: `margin-left:-28px`, padding `30px 16px 22px 28px` → 160px content). Top → bottom: brand (13px, .12em, 500) · 업무/출석 switch · **year month-picker** · nav list · bottom nav (`margin-top:auto`). No right border — the fill is the edge (plus a 1px fg-6% inset shadow).
+- **Month picker** (`window.MonthPicker(el,{months,sel,go,dot,dotLabel})`, one renderer shared by both calendars): header row 28px high — `‹` 28×28 icon button (radius 8, 14px chevron) · year label 13px/600 tabular · `›`; steps only between years that have months in range (disabled at the ends). Below, a 4×3 grid (`gap:4px`, cells ≈37×32px, radius 8) of `1월`…`12월` at 12px. States: enabled `--fg`; **selected** (shown month) `--surface` fill + weight 600 + `aria-current="true"`; **this month** `--now` text (both when selected); **out of range** (업무 before 2026-11, 출석 before 2026-12, after 2028-01) `disabled` + `--faint` at 55% opacity, not focusable; hover `--hover`. A 4px dot (`currentColor` 50%, 3px from the bottom) = density hint: work calendar → open (not done) items due that month; attendance → an active 방학·휴업일 (`KR_FIXED`) touches the month. The stepper year follows the shown month whenever it changes (‹ › in the hero, PgUp/PgDn, Alt+←/→, 오늘, clicking a month, week navigation in 주 시간표). Keyboard: the grid is one Tab stop (roving `tabindex`), ←/→ move between enabled months and roll over to the previous/next year, ↑/↓ move by a row, Home/End, PgUp/PgDn step the year, Enter/Space opens (focus stays on the month).
 - **Nav list** (`nav.tools`): eyebrows 12px/.1em `--faint` (업무: `보기`; 출석: `관리`, `기록`), rows full-width, `min-height:34px`, padding `7px 10px`, radius 8, gap 10px, 16px stroke icon (`--faint`) + 13px label (`--muted`, .02em). Hover `--hover` fill + fg. Active (filter drawer open, `.tool.on`) `--surface` fill + fg + `--now` icon + a 2px `--now` bar at the left (top/bottom inset 8px). Order — 업무: 필터 · 다가오는 마감 · 전체보기 │ bottom: 배경화면 · 설정. 출석: 학생부 · 외부강사 · 수업일 설정 · 출결 분석 · 엑셀 내보내기 │ bottom: 백업. Icons (sprite): `i-filter`, `i-clock`, `i-expand`, `i-img`, `i-gear`, `i-users`, `i-user`, `i-calchk`, `i-chart`, `i-table`, `i-archive`.
 - **Rail ≤900px**: a top bar (glass fill, full bleed), picker and eyebrows hidden, nav items in one wrapping row without icons (padding 6px 7px); months via ‹ › in the hero.
 - **Hero** (one compact band): `‹ NOVEMBER › [오늘]` on the left (the month arrows sit beside the title they change; aria-labels and PgUp/PgDn · Alt+←/→ unchanged), a sub line under it (`2026 · 11월` · today link · filter / 예시 notices inline, no separate banner), and stats + underline search on the right. No eyebrow. Same structure in the attendance calendar. At `max-height:780px` the title/padding shrink further.
@@ -152,11 +154,13 @@ Dashes otherwise appear only in transient states: drop target (`.cdrop`, `.drop`
 - **Inputs**: underline only (1px cream). Focus → dashed underline.
 - **Drawers**: filter (left of content, next to rail) and item detail (right, Slack-like). `--raise` fill + soft shadow, no edge line; filter rows (`.sbtn`) are 8px-radius rows with `--hover` hover and `--surface` + 2px `--now` inset bar when on. At ≥1280px the detail panel is a third grid column (`clamp(340px,24vw,440px)`) so the calendar reflows instead of being covered; below that it overlays.
 - **Modals**: day / all-months / settings (tabs). `--raise` fill, 1px `--frame` border, radius 12, soft shadow; tabs underline the active tab with 2px solid fg.
+- **Settings › 달력 설정 (editable 방학·휴업일, shared by both calendars)**: one user list stored under `fixed-sched-v1` (`window.KR_FIXED`, live array edited in place; `window.KR_FX` = `html/click/edit/imp/list`). Defaults come from `FX_DEF` (table in `FIXED-2027.md`: 동계 방학 (26–27) 2026-12-21–2027-01-08 · 하계 방학 2027-07-19–08-20 · 동계 방학 (27–28) 2027-12-20–2028-01-14 · 공단 창립기념일 2027-09-01 — the years in the two 동계 names keep them apart in the list; only the *defaults* carry them, a user's saved names are never rewritten). Same tab in the attendance calendar under 수업일 설정. UI: an **add form** (이름 · 종류 방학/휴업일 · 시작 · 끝, end empty = one day, max 50) above a **list** where each row has an on/off checkbox, editable 이름, 종류 select, 시작/끝 date inputs (limited to 2026.11–2028.01), `평일 N일`, and a two-step 삭제 (`삭제` → `삭제 확인`/취소); a **기본값** block restores `FX_DEF` with the same two-step confirm. Edits apply on change and re-render both calendars (`fxSubs`). Rules: 끝 before 시작 is refused; an invalid/out-of-range date reverts the field with an inline message; **moving 시작 past 끝 shifts 끝 by the same length** (clamped to the range end) instead of failing. Effects: attendance — no class for all 직종 on weekdays inside an enabled item (holiday wins; 방학 and 휴업일 map to the `vac`/`closed` kinds); 업무 — a small muted note in the weekday cell (weekdays only). The list travels with both JSON backups as `fixed`; import accepts the legacy per-calendar `disabledFixed` list too (`fxImport`), and the same legacy list is migrated once on first load (v14's `disabledFixed` no longer exists as live state).
+- **Quick-add on phones (≤640px, v17)**: the row wraps — the input takes its own full line (min 200px; 306px at 390, 276px at 360) and the `# @ ! 📅 ⓘ ⤢` buttons plus send sit on a second line (send pushed right). Before, seven fixed-width buttons squeezed the input to ~5px.
 - **Token buttons** `# @ !` + calendar icon (+ `⤢` 자세히 + send): 28px solid `--frame`-outline circles that insert syntax into the quick-add field. The date token inserts the next weekday as `/MM-DD` and advances one weekday per click (a range is typed by hand: `/11-12~12-25`).
 - **Token highlight (`.qin` + `.mir`)**: the quick-add and day-modal inputs have transparent text over a same-font mirror layer (same box, padding and font; tokens get no horizontal padding or weight change, so the caret never drifts). Kind is told by the prefix (`#` `@` `!` `/`), value by shape: tag by weight (see §2), assignee `@나` = Bark fill + solid outline, others dashed; priority high = the urgent cream pill (bare `!` counts, see §7) / low = muted dashed; date by proximity to today — overdue `--over` dashed (hint chip adds `D+n`), today/tomorrow/in-range Bark + cream outline (+ `오늘`/`내일`/`진행`), within 7 days solid stitch, later muted dashed; invalid date = `--over` dashed + wavy underline. The `!` token button toggles high (inserts `! ` at the start, `aria-pressed` + Bark when on). The hint line (`#qa-hint`) shows the same kinds as chips (`.hc`), plus dashed suggestion chips for existing `#`/`@` words while typing one.
 - **Composer (modal `compose`)**: 항목 추가 popup for details. Opens by dropping files on the quick-add bar, the `⤢` button, or Shift+Enter in the bar (typed text is parsed into fields). Fields: title, 시작일/기한 (+ an inline Mon–Fri month calendar: drag a range, click = one day, Shift+click extends, arrows/Space/Enter/Shift+arrows/PageUp·Down by keyboard; kept in sync with the date fields), tag chips (+ suggestions), assignee chips, 중요도 segmented, 완료 체크 segmented (자동 · 필요 · 일정·참고), memo, document links. Entry point `openComposer({title,start,due,tags,who,pr,kind,memo,links,text})`. The detail panel uses the same chip editor (`edHTML('d',…)`): space becomes `_`, Enter/comma commits, Backspace on empty removes the last chip, × removes, focus-out commits. Enter in title or Ctrl+Enter saves, Esc cancels (bar text is kept). Several files become one item with all links; `파일별로` saves one item per file.
 - **Drop targets**: while dragging a file, the cell / detail panel / day modal / quick-add bar / composer under the pointer shows a centered `여기에 놓기` pill (bg fill, 1px dashed cream).
-- **Info icon `.ti`**: 22px circle `ⓘ` (32px hit area); hover/focus shows a Bark tooltip (`white-space: pre-line`, 12.5px) rendered as a real `role=tooltip` element. `.r` variant anchors right to avoid clipping at panel/modal edges.
+- **Info icon `.ti`**: 22px circle `ⓘ` (32px hit area); hover/focus shows a Bark tooltip (`white-space: pre-line`, 12.5px) rendered as a real `role=tooltip` element. v17: the hidden tooltip is `display:none` (an invisible-but-laid-out absolute box widened the page and made a horizontal scrollbar at 901–1114px; `aria-describedby` still resolves), and `placeTip()` flips it to the other side (`.fl`) on mouseover/focus when it would leave the viewport. `.r` variant anchors right to avoid clipping at panel/modal edges.
 
 ## 7. Text-input & copy rules (anti-wordiness)
 
@@ -171,11 +175,17 @@ Dashes otherwise appear only in transient states: drop target (`.cdrop`, `.drop`
 
 ## 8. Ember rules
 
-Allowed: holiday date/label, holiday badge border, error hints. Not allowed: buttons, selected states, links, today marker.
+Ember family = `--ember` (borders, errors), `--hol-fg` (holiday text) and `--over` (overdue). Allowed: holiday date/label, holiday badge border, overdue `D+n` / 지연, error hints. Not allowed: buttons, selected states, links, today marker.
 
 ## 9. Wallpaper (canvas PNG, default 1920×1080)
 
-Dark canvas; uppercase English month; `MON–FRI` header; hairline dashed grid (fg 26%, same as `--line`) + 2px dashed outer frame; urgent = cream pill; done = `mute` (fg 66%, same as `--muted`) + strike + `✓`; tag dots read the `--c0…c4` tokens; out-of-month days at 58% (= `--strong`, 6.1:1); today is **not** marked (static image); holiday cells ember @ 16% fill; placement right/center/full to clear desktop icons; bottom 10% reserved for the taskbar.
+The PNG is drawn by `drawWallpaper()` with **its own palette** — it deliberately does not mirror the app tokens one-to-one, so the numbers below are the wallpaper's, not `--line`/`--muted`/`--strong`:
+
+- **Canvas** `#100904` by default (a notch darker than the app's `--bg #1a140f`, so the image sits back behind desktop icons; user-selectable in Settings › 배경화면, not tied to the theme). Ink `#ffedd7` (`#1d1c1f` on a light canvas), `mute` = ink 66%, hairline = ink 26%.
+- Uppercase English month; `MON–FRI` header; hairline dashed grid (ink 26%) + 2px dashed outer frame (ink 55%); out-of-month days drawn at 58% opacity; today is **not** marked (static image); holiday / custom-off cells tinted at 16% of their color (default `#f0661a`); placement right/center/full to clear desktop icons; bottom 10% reserved for the taskbar.
+- **Urgent items**: cream pill (`ink` fill, canvas-colored text, `!` prefix). **Urgent range bars follow the app's v16 outline style** (v17): ink 16% fill + 1px ink border + 3px ink end cap, ink text — no cream fill.
+- **Done**: `mute` text + strike + `✓`; done range bars are hollow with a *solid* 1px hairline outline (no dashes, as in the app) and a `mute` end cap.
+- **Normal range bars**: tag color at 30% fill + 3px end cap (wallpaper-specific). Tag dots read `--c0…c4` at draw time; fallbacks (`WPC_FALLBACK`) equal the current token values; an item with no tag gets `--c0` like in the app.
 
 ## 10. Do / Don't
 
@@ -192,9 +202,9 @@ Dark canvas; uppercase English month; `MON–FRI` header; hairline dashed grid (
 
 ## 12. Attendance calendar (출석 달력)
 
-Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own storage key `attend-cal-v1`. The rail's **행정 / 출석** radio pair switches modes (remembered in `cal-mode`; `?mode=att` opens it directly). Admin handlers return early while `body[data-mode=att]`.
+Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own storage key `attend-cal-v1`. The rail's **업무 / 출석** radio pair switches modes (remembered in `cal-mode`; `?mode=att` opens it directly). Admin handlers return early while `body[data-mode=att]`.
 
-**Range** 2026.12 – 2028.01 (the admin calendar runs 2026.11 – 2028.01). Legal holidays live once in `window.KR_HOLIDAYS`; each calendar keeps its own on/off list.
+**Range** 2026.12 – 2028.01 (the 업무 calendar runs 2026.11 – 2028.01). Legal holidays live once in `window.KR_HOLIDAYS`; each calendar keeps its own on/off list.
 
 **Rules**
 - 훈련소정일수 = weekday, not a holiday, not covered by a "수업 없음" 특이사항, within the student's 입학–수료 dates. 6 periods/day (45 min, lunch 12–13), editable times.
@@ -203,7 +213,8 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
 - 지각+조퇴+결과 (non-converted) 3 → 결석 1일, computed **per calendar month**, summed for longer ranges.
 - 출석일 = 소정일 − (유고 + 무단 + 50%미만 + 환산). Rates < 80% use `--c4`.
 - 통학/기숙 per day: 기숙사 입소일 set → 기숙 from that date; otherwise 통학 = N means 기숙 for the whole period. 취성패 Y → 훈련참여수당 0원 (export note). 환산결석 days are taken off 통학/기숙 출석일 too (from the month's last 지각·조퇴·결과 days, by that day's status), so 통학 + 기숙 = 출석일.
-- Imported backups are validated (`normA`): ids `[A-Za-z0-9_-]`, dates `YYYY-MM-DD`, periods 1–6, hex colors; references to missing tracks/students are dropped.
+- Dates outside the attendance range (before `AMIN` 2026-12-01 or after `AMAX` 2028-01-31 — e.g. the 11/30 spill-over cell/column of December 2026, 2028-02-01…) are *outside* (v17): `sched()` returns `oor` with no class periods, so they are dimmed (`.cell.oor`, `.wh.oor`, `.pc.oor`), have no `수업 N교시` label, are not clickable/selectable (week-timetable period cells are `disabled`; drag/row/column selection skips them) and never count in stats, hours or exports.
+- Imported backups are validated (`normA`): ids `[A-Za-z0-9_-]`, dates `YYYY-MM-DD`, periods 1–6, hex colors; references to missing tracks/students are dropped; non-array fields become empty lists and duplicate ids are dropped. The work-calendar `normalize()` does the same (v17): `tags`/`assignees` string → `[string]`, anything else → `[]`; checklist/links entries are coerced; items without an id, a title or a valid `YYYY-MM-DD` due are dropped; user-keyed maps (`tagColors`, `tagAuto`, `tagWeights`, `tagDone`) are prototype-less (`Object.create(null)`) so tags named `constructor`, `valueOf`, `toString` or `__proto__` behave like any other name.
 - Analysis and export count only up to today by default ("오늘까지만"), so future default-출석 days don't inflate rates. Lecturer hours include planned periods.
 
 **Views** month (per 직종 or 전체) · 주 시간표 (drag a rectangle of period cells, Ctrl+click to add; action bar assigns/clears 외부강사 or 특이사항) · day modal (period grid with the same drag selection + per-student status pills).
@@ -217,6 +228,24 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
 - **라이트 테마 (light blue-grey) — 추후.** Not in v16. Starting point = the review's "paper" preset tokens, but the user wants a **light blue-grey** direction rather than warm paper: bg ≈ `#eef1f5`, surfaces cool grey (raise ≈ `#e4e8ee`, hover ≈ `#dbe0e7`, surface ≈ `#cfd6df`), fg ≈ `#1f2630`, `--now` deeper blue ≈ `#2f6690`; line/frame as fg 13%/24% mixes; category hues re-tuned for ≥4.5:1 on the light bg; ambient light becomes a faint cool sky glow; holiday ember darkened for AA. Ship as a `[data-theme=light]` / preset, keep `color-scheme` in sync.
 
 ## 14. Changelog
+
+**v17 (audit fix batch · 업무 달력 rename)**
+1. **Rename:** the two calendars are **업무 달력** and **출석 달력** (was 행정 / 출석). The rail switch reads `업무 / 출석`; every UI string, toast, tooltip and doc says 업무. Internal ids are unchanged (`data-mode="admin"`, stored `cal-mode`, `#app`). Tag names such as `행정` in user data/sample data are not touched.
+2. **Phones:** quick-add wraps at ≤640px — input on its own line (≥200px at 390/360), buttons below (§6).
+3. **Contrast:** urgent pills in out-of-month cells keep their colors and fade with `opacity:.72` instead of getting `--muted` text (was 1.7:1); out-of-month urgent range bars keep `--fg` text.
+4. **Tooltips:** hidden `.tt` is `display:none` (no phantom overflow → no horizontal scroll at 901–1114px in either calendar); shown tooltips flip sides to stay in the viewport (`.fl`).
+5. **No clipped chips:** `fitChips()` may fold bars and chips down to zero (`+N개 더` only) when even one doesn't fit, instead of stopping at one and clipping ~11px at 900×700 / 1024×600.
+6. **Long names:** tag/assignee chips (`.hc > .hn`), filter rows, hint chips and Settings › 태그 truncate with an ellipsis (+ `title` with the full name) and `min-width:0` parents, so 삭제 and the panel edge stay visible.
+7. **Robust data:** user-keyed maps are prototype-less; tags named `constructor`/`valueOf`/`toString`/`__proto__` get colors and counts. `normalize()`/`normA()` coerce non-array fields (string → `[string]`, else `[]`) and drop items without id/title/due; ids are made safe and unique.
+8. **출결 분석 before the school year:** shows `학기 시작 전 (2026.12.01부터 집계)` instead of an inverted range.
+9. **PageUp/PageDown** change the month from any focus in the 업무 달력 too (same rule as 출석: not in inputs, not with a modal open, no modifier).
+10. **학생부** 직종 select is as wide as the longest 직종 name (`--tw`), so `제과제빵` is no longer cut to `제과저`.
+11. **Attendance range edge:** dates before 2026-12-01 / after 2028-01-31 (11/30 spill-over, week column, 2028-02-01…) are dimmed *outside* cells: no `수업 N교시`, not clickable/selectable, not counted.
+12. **A11y:** `#nav-filter` `aria-expanded`; 업무/출석 switch is a roving-tabindex radiogroup with arrow keys (both calendars).
+13. **Wallpaper bars** follow the app's v16 bar style (urgent = ink 16% fill + 1px ink border, done = solid hollow outline); wallpaper palette documented in §9.
+14. **Copy/consistency:** attendance ‹ › titles `이전/다음 달 (PageUp/PageDown)` (`주` in 주 시간표); out-of-range toasts unified (`오늘은 달력 범위 밖이에요 (범위)` / `달력 범위 밖이에요 (범위)`); `FX_DEF` names `동계 방학 (26–27)` / `(27–28)` (defaults only); disabled month-picker stepper `.55`; principles re-ordered; ember family defined as `--ember`/`--hol-fg`/`--over`.
+15. **Cleanup:** new tokens `--shadow`, `--scrim`; dead `.stat{gap:14px}`, unused icons (`i-stack`, `i-set`, `i-s`, `i-menu`, `i-save`), `curRange`, `gomonth` cases and `data-op` removed; palette fallbacks (`WPC_FALLBACK`, color-picker defaults) = current tokens; `KC`/`SJC` seeds and the legacy wallpaper migration keep their old values on purpose (commented).
+Tests: `node tools/verify-audit-fixes.js` (items 2–12, each a PASS line); `verify-rail.js` now seeds with a `localStorage` marker (the old `sessionStorage` marker was lost on reload in ~1 of 4 runs).
 
 **v16 (eye-strain overhaul · rail picker · ambient light)**
 1. **Contrast & palette:** fg `#e8d9c5` on bg `#1a140f` (17.3 → ≈13.2:1), muted/faint 70/54%, elevation steps `#1a140f` / `#211a14` / `#2a211a` / `#3d3025`, equalized category hues (c1 `#9cc48a`, c2 `#dcb75e`, c3 `#b9a6ea`, c4 `#e59bb2`, c0 `#c9b79f`), holiday `#2a1b12` / `#ec7a3c`.
@@ -237,10 +266,10 @@ Tests: `node tools/verify-rail.js` (picker sync & range limits in both calendars
 2. **Keyboard:** Alt+←/→ on a focused chip or bar moves it one weekday; the detail panel date fields remain the full alternative.
 
 **v14 (fixed schedule · special classes)**
-1. **2027 확정 일정** (`window.KR_FIXED`, source `FIXED-2027.md`): 동계 방학 26.12.21–27.1.8, 하계 방학 27.7.19–8.20, 동계 방학 27.12.20–28.1.14, 공단 창립기념일 27.9.1.
+1. **2027 달력 설정 defaults** (방학·휴업일; `window.KR_FIXED`, source `FIXED-2027.md`): 동계 방학 26.12.21–27.1.8, 하계 방학 27.7.19–8.20, 동계 방학 27.12.20–28.1.14, 공단 창립기념일 27.9.1.
    - Attendance calendar: no class for all 직종 (holiday takes precedence).
    - Work calendar: muted small note in weekday cells (no ember).
-   - Each item can be turned off in Settings (`disabledFixed`).
+   - v14 turned items off with a per-calendar `disabledFixed` list. That list is gone as live state: since the editable 설정 › 달력 설정 tab (see §6) everything lives in the shared `fixed-sched-v1` list, and old `disabledFixed` values are migrated once on first load / backup import.
 2. **Both calendars extended to 2028.01**, with 2028-01-01 신정 added.
 3. **출석 달력 특별 수업 (세부과목):** 기본 8과목 (보건·소방재난예방·노동인권·물리&작업·직업기초·훈련지원·특수체육·사회성훈련). Set per 직종 and date, by 교시 or whole day; separate from 강사.
    - Week/day cells: small bold label in the subject's color (`.sp`, inline style). Month cell: 특별 과목명 (each in its color) on one line (ellipsis).
@@ -264,12 +293,12 @@ Tests: `node tools/verify-rail.js` (picker sync & range limits in both calendars
    - **Drag-select:** press and drag on empty grid cells (or Shift+arrows, then Enter) to open the composer with that range. The composer has a weekday mini calendar for range picking.
 8. **Chip density:** `D+n` sits inside the chip, and the attachment button appears only on hover or focus.
 
-9. **Small fixes:** the `TODAY` word hides when the cell header is under 120px (the circled number already marks today, so it no longer shows as `T…` beside the detail panel). Holiday and custom-day labels carry a `title` for when they are cut off. Settings › 입력 symbols apply as you type, without needing to leave the field.
+9. **Small fixes:** the `TODAY` word hides when the cell header is under 120px (the circled number already marks today, so it no longer shows as `T…` beside the detail panel) *(v16에서 제거 — the word no longer exists)*. Holiday and custom-day labels carry a `title` for when they are cut off. Settings › 입력 symbols apply as you type, without needing to leave the field.
 
 Tests: `tools/verify-{,quickadd-,ranges-,tokens-,settings-}*.js` (see each file header).
 
 **v12 (on-device feedback)**
-1. **Month arrows beside the title** (`‹ NOVEMBER › [오늘]`), in both the admin and attendance calendars. A control sits next to the thing it changes.
+1. **Month arrows beside the title** (`‹ NOVEMBER › [오늘]`), in both the 업무 and 출석 calendars. A control sits next to the thing it changes.
 2. **Proportions:** the hero is one compact band, and the 예시/필터 notices moved into the sub line. The grid fills the viewport with equal `1fr` rows, and no page scroll is forced on load. `fitChips()` shows as many chips as fit the cell height, and `+N개 더` moves next to the day number so it doesn't take up a chip row. Setting `previewCap` (default 자동). NEXT UP is below the fold, reached via the rail link `다가오는 마감`. The urgent pill can use the full cell width.
 3. **Quick-add:**
    - Inline tokens (`#` `@` `!` `/date`) are highlighted as pills inside the input, using a mirror layer.
@@ -277,7 +306,7 @@ Tests: `tools/verify-{,quickadd-,ranges-,tokens-,settings-}*.js` (see each file 
    - New `/` date syntax: `/2026-11-12`, `/11-12`, `/11-12~12-25` (a range sets `start` and `due`).
    - Dropping files on the bar, the `⤢` button, or Shift+Enter opens a composer popup (title, 시작일/기한, tag and assignee chips with suggestions, 중요도, 메모, links). Verify with `node tools/verify-quickadd.js <dir>`.
 
-**v11 (출석 달력)** — 행정/출석 mode switch; 2027.12 range + 2027 H2 holidays; attendance module (학생부·직종·외부강사·수업일 명부·교시 시간), month/week/day views with drag period selection, 50%/3회 rules, analysis modal, offline xlsx export, JSON backup; rail month list tightened to fit 14 months.
+**v11 (출석 달력)** — 업무/출석 mode switch; 2027.12 range + 2027 H2 holidays; attendance module (학생부·직종·외부강사·수업일 명부·교시 시간), month/week/day views with drag period selection, 50%/3회 rules, analysis modal, offline xlsx export, JSON backup; rail month list tightened to fit 14 months.
 
 **v10 (review follow-up)** — one commit per item on `feat/review-fixes`:
 1. Detail panel is a grid column at ≥1280px (calendar reflows; THU/FRI and today stay visible); edge is now a 2px stitch.

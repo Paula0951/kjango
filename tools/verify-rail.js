@@ -14,7 +14,7 @@ let fails = 0; const ok = (name, c) => { if (!c) fails++; console.log((c ? 'PASS
   const b = await chromium.launch(); const errs = [];
   const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'Asia/Seoul', locale: 'ko-KR' });
   const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.addInitScript(s => { if (!sessionStorage.getItem('seeded')) { localStorage.clear(); localStorage.setItem('weekday-cal-v1', s); sessionStorage.setItem('seeded', '1'); } }, JSON.stringify(DATA));
+  await p.addInitScript(s => { if (!localStorage.getItem('__seeded')) { localStorage.clear(); localStorage.setItem('weekday-cal-v1', s); localStorage.setItem('__seeded', '1'); } }, JSON.stringify(DATA));
   await p.clock.setFixedTime(new Date('2026-11-26T10:00:00+09:00'));
   await p.goto(URL_); await p.waitForTimeout(300);
 
@@ -76,7 +76,11 @@ let fails = 0; const ok = (name, c) => { if (!c) fails++; console.log((c ? 'PASS
   ok('분류 색: 칸 칩 색 4가지 (' + chipCols + ')', chipCols === 4);
   await p.reload(); await p.waitForTimeout(300); const S2 = await tc();
   ok('분류 색: 다시 열어도 같음', JSON.stringify(S2.tagAuto) === JSON.stringify(S.tagAuto));
-  await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('weekday-cal-v1')); S.tagColors = { 회의: 3 }; localStorage.setItem('weekday-cal-v1', JSON.stringify(S)); }); await p.reload(); await p.waitForTimeout(300);
+  // 쓰고 → 다시 열기. 헤드리스 크롬(file://)은 가끔 다시 열 때 localStorage 를 옛 값으로 읽어서(앱과 무관) 반영될 때까지 몇 번 다시 시도한다
+  for (let k = 0; k < 5; k++) {
+    await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('weekday-cal-v1')); S.tagColors = { 회의: 3 }; localStorage.setItem('weekday-cal-v1', JSON.stringify(S)); }); await p.waitForTimeout(250); await p.reload(); await p.waitForTimeout(300);
+    if (await p.evaluate(() => { const S = JSON.parse(localStorage.getItem('weekday-cal-v1')); return !!S.tagColors && S.tagColors['회의'] === 3; })) break;
+  }
   const dot = await p.evaluate(() => { const b = [...document.querySelectorAll('#grid .chipw')].find(e => e.textContent.includes('회의 항목')); return b.style.getPropertyValue('--tc'); });
   ok('분류 색: 직접 고른 색(tagColors)이 먼저 ' + dot, dot === 'var(--c4)');
   await p.fill('#qa', '새 일 #신규 /11-27'); await p.keyboard.press('Enter'); await p.waitForTimeout(200); const S3 = await tc();
@@ -84,8 +88,11 @@ let fails = 0; const ok = (name, c) => { if (!c) fails++; console.log((c ? 'PASS
   ok('분류 색: 새 분류 = 가장 적게 쓰인 색 ' + S3.tagAuto['신규'] + ' ' + JSON.stringify(use), S3.tagAuto['신규'] === use.indexOf(Math.min(...use)));
 
   // ---- 출석 달력 ----
-  await p.evaluate(() => { localStorage.setItem('attend-cal-v1', JSON.stringify(window.__attTest.sampleA())); localStorage.setItem('cal-mode', 'att'); });
-  await p.reload(); await p.waitForTimeout(400);
+  for (let k = 0; k < 5; k++) {
+    await p.evaluate(() => { localStorage.setItem('attend-cal-v1', JSON.stringify(window.__attTest.sampleA())); localStorage.setItem('cal-mode', 'att'); });
+    await p.waitForTimeout(250); await p.reload(); await p.waitForTimeout(400);
+    if (await p.evaluate(() => localStorage.getItem('cal-mode') === 'att' && (localStorage.getItem('attend-cal-v1') || '').length > 100)) break;
+  }
   const B = '#a-months'; s = await st(B);
   ok('출석: 처음 = 2026 · 12월 (AMIN), 11월은 이번 달이지만 범위 밖 ' + JSON.stringify(s), s.yr === '2026' && s.cur === '12월' && s.en === '12월' && s.title === 'DECEMBER' && s.prevDis && s.now === '11월');
   ok('출석: 점 = 방학·휴업일 있는 달 (12월)', s.dots === '12월');
