@@ -3093,10 +3093,12 @@ function goA(n){
   if(au.view==='week'){const w=K(addD(P(au.wk),7*n));if(K(addD(P(w),4))<AMIN||w>AMAX){toast(ALAB+'만 있어요');return;}au.wk=w;const i=AM.findIndex(m=>w.startsWith(ymOf(m)));if(i>=0)au.mi=i;au.sel.clear();renderA();return;}
   const v=au.mi+n;if(v<0||v>=AM.length){toast(ALAB+'만 있어요');return;}au.mi=v;au.fk=null;renderA();
 }
+/* 바깥(스크림) 클릭으로만 닫기: 안에서 끌다가 밖에서 놓아도 닫히지 않게 누른 곳도 확인 */
+let aovDown=false;document.addEventListener('pointerdown',e=>{aovDown=e.target===$('aov');},true);
 document.addEventListener('click',e=>{
   const sw=e.target.closest('.modesw [data-mode]');if(sw){setMode(sw.dataset.mode);return;}
   if(!isAtt())return;
-  if(e.target===$('aov')){closeAM();return;}
+  if(e.target===$('aov')){if(aovDown)closeAM();return;}
   const t=e.target.closest('[data-a]');
   const pc=e.target.closest('[data-pc]');
   if(pc&&!t){if(e.detail===0){const key=pc.dataset.k+'|'+pc.dataset.p;au.sel.has(key)?au.sel.delete(key):au.sel.add(key);paintSel();renderActBar();}return;}
@@ -3239,6 +3241,7 @@ $('amodal').addEventListener('change',e=>{
 document.addEventListener('keydown',e=>{
   if(!isAtt())return;
   if(e.key==='Escape'){const ti=[...document.querySelectorAll('#att .ti,#amodal .ti')].find(x=>!x.classList.contains('tt-off')&&(x===document.activeElement||x.matches(':hover')));if(ti){e.preventDefault();ti.classList.add('tt-off');return;}
+    if(drag){e.preventDefault();endDrag(true);return;}/* 끄는 중 Esc: 드래그만 취소, 원래 선택으로 */
     if(au.modal){e.preventDefault();closeAM();return;}if(au.sel.size){au.sel.clear();paintSel();renderActBar();}return;}
   if(au.modal&&e.key==='Tab'){const f=[...$('amodal').querySelectorAll('button,a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(x=>!x.disabled&&x.offsetParent!==null);if(f.length){const a=f[0],z=f[f.length-1];if(e.shiftKey&&(document.activeElement===a||!$('amodal').contains(document.activeElement))){e.preventDefault();z.focus();}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus();}}return;}
   if(au.modal&&e.target.getAttribute('role')==='tab'){const ts=[...$('amodal').querySelectorAll('[role=tab]')],i=ts.indexOf(e.target),j={ArrowLeft:i-1,ArrowRight:i+1,Home:0,End:ts.length-1}[e.key];if(j!=null){e.preventDefault();const n=ts[(j+ts.length)%ts.length];au.tab=n.dataset.v;renderAM();const nt=$('atab-'+au.tab);nt&&nt.focus();}return;}
