@@ -1,3 +1,5 @@
+> **⚠ 역사 기록 (historical).** 이 문서는 **v8** 시점의 디자인 리뷰이며, **DESIGN.md(v16 이후)가 현재 기준**이다. 아래 팔레트·오늘(TODAY) 표시 제안은 그대로 구현하지 말 것 — 오늘 표시는 `--now` 막대 하나, 색은 DESIGN.md §2 토큰이 정답이다.
+
 # UI/UX Review — 평일 업무 달력 (app.html v8)
 
 Screenshots are in this directory (Playwright, headless Chromium, clock frozen at 2026-11-13 10:00). Contrast is WCAG 2.x, measured on `--bg #100904` unless noted.
