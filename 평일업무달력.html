@@ -361,6 +361,9 @@ button.wh:hover{background:var(--hover)}
 .atbl input[type=date].fi{min-width:128px}
 .atbl select.fi{min-width:58px}
 .low{color:var(--c4)}
+.ab.rk.fail{border-color:var(--c4);color:var(--c4)}.ab.rk.warn{border-color:var(--c2);color:var(--c2)}
+.stat .rkb{all:unset;cursor:pointer;border-bottom:1px dashed var(--strong)}.stat .rkb:focus-visible{outline:2px dashed var(--fg);outline-offset:3px}.stat .rkb.bad b{color:var(--c4)}
+.srow2 .nm .ab.rk{display:inline-block;margin-top:4px;font-size:10.5px}
 .chk{display:flex;gap:8px;align-items:center;font-size:13px;padding:6px 0}
 .chk input{width:16px;height:16px}
 .pick{display:flex;gap:6px;flex-wrap:wrap}
@@ -1343,7 +1346,7 @@ function normA(s){
   const tid=v=>okId(v)&&tracks.some(t=>t.id===v)?v:'';
   const lecturers=arr(s.lecturers).filter(hasId).map(x=>({id:x.id,name:str(x.name),subject:str(x.subject),phone:str(x.phone),memo:str(x.memo),...(x.ex?{ex:true}:{})}));
   const kinds=arr(s.kinds).filter(hasId).map(k=>({id:k.id,name:str(k.name),noClass:!!k.noClass,color:HEX_RE.test(k.color)?k.color:KC[4]}));
-  const students=arr(s.students).filter(hasId).map(x=>({id:x.id,name:str(x.name),track:tid(x.track),no:str(x.no),admit:okDate(x.admit),complete:okDate(x.complete),commute:x.commute==='N'?'N':'Y',dorm:okDate(x.dorm),cnp:x.cnp==='Y'?'Y':'N',memo:str(x.memo),...(x.ex?{ex:true}:{})}));
+  const students=arr(s.students).filter(hasId).map(x=>({id:x.id,name:str(x.name),track:tid(x.track),no:str(x.no),admit:okDate(x.admit),complete:okDate(x.complete),commute:x.commute==='N'?'N':'Y',dorm:okDate(x.dorm),cnp:x.cnp==='Y'?'Y':'N',govEnd:okDate(x.govEnd),memo:str(x.memo),...(x.ex?{ex:true}:{})}));
   const lect={};Object.entries(obj(s.lect)).forEach(([k,v])=>{const [d,t]=k.split('|');if(!DATE_RE.test(d)||!tid(t)||!Array.isArray(v))return;const a=Array.from({length:NP},(_,i)=>okId(v[i])?v[i]:'');if(a.some(Boolean))lect[k]=a;});
   const sids=new Set(students.map(x=>x.id)),att={};
   Object.entries(obj(s.att)).forEach(([k,v])=>{const [d,id]=k.split('|');if(!DATE_RE.test(d)||!sids.has(id)||!v||typeof v!=='object'||!ST.includes(v.s))return;const r={s:v.s};if(PART.includes(v.s))r.p=okPs(v.p);if(v.m)r.m=str(v.m);att[k]=r;});
@@ -1408,24 +1411,43 @@ function evalDay(s,k){
 }
 function weekdays(a,b){const out=[];let d=P(a);const e=P(b);while(d<=e){const w=d.getDay();if(w&&w<6)out.push(K(d));d=addD(d,1);}return out;}
 const monthRange=m=>[ymOf(m)+'-01',K(new Date(m.y,m.m+1,0))];
-/* 학생 통계: 지각·조퇴·결과 3회 = 결석 1일 (달마다 따로 환산) */
+/* 단위기간: 재적 기간 안, 타 국비 지원 종료일(govEnd) 다음날부터. 그 전 날은 출결은 적되 출석률에는 안 셈 */
+const inUnit=(s,k)=>enrolled(s,k)&&(!s.govEnd||k>s.govEnd);
+const RATE_MIN=.8;
+/* 학생 통계 (지각·조퇴·결과 3회 = 결석 1일, 달마다 따로 환산)
+   sd 소정훈련일수 · ia 출석인정일수 = sd − (무단 + 50%미만 + 환산), 유고결석은 출석으로 인정
+   ra 실출석일수 = sd − (유고 + 무단 + 50%미만) · abs = 출석으로 인정 안 되는 결석 · rate = ia / sd */
 function statStu(s,a,b){
-  const o={sd:0,sp:0,ap:0,yu:0,mu:0,ji:0,jo:0,gy:0,conv:0,hw:0,abs:0,att:0,dd:0,cd:0,rate:null,en:false};const mp={};
+  const o={sd:0,sp:0,ap:0,yu:0,mu:0,ji:0,jo:0,gy:0,conv:0,hw:0,abs:0,ia:0,ra:0,att:0,dd:0,cd:0,rate:null,en:false};const mp={};
   weekdays(a,b).forEach(k=>{
     if(enrolled(s,k))o.en=true;
+    if(!inUnit(s,k))return;
     const e=evalDay(s,k);if(!e)return;o.sd++;o.sp+=e.n;
     if(e.st==='유고결석')o.yu++;else if(e.st==='무단결석')o.mu++;
     else if(e.conv)o.conv++;
     else if(e.st!=='출석'){o[{지각:'ji',조퇴:'jo',결과:'gy'}[e.st]]++;const m=k.slice(0,7);(mp[m]=mp[m]||[]).push(isDorm(s,k));}
-    if(!e.abs){o.ap+=e.n-e.miss;if(isDorm(s,k))o.dd++;else o.cd++;}
+    if(!e.abs)o.ap+=e.n-e.miss;
+    if(!e.abs||e.st==='유고결석'){if(isDorm(s,k))o.dd++;else o.cd++;}
   });
-  /* 환산결석 n일 = 그 달 마지막 지각·조퇴·결과 n일을 출석일에서 뺌 (그날의 통학·기숙 기준) */
+  /* 환산결석 n일 = 그 달 마지막 지각·조퇴·결과 n일을 출석인정일에서 뺌 (그날의 통학·기숙 기준) */
   Object.values(mp).forEach(days=>{const n=Math.floor(days.length/3);o.hw+=n;days.slice(days.length-n).forEach(d=>{if(d)o.dd--;else o.cd--;});});
-  o.abs=o.yu+o.mu+o.conv+o.hw;o.att=Math.max(0,o.sd-o.abs);o.rate=o.sd?o.att/o.sd:null;
+  o.abs=o.mu+o.conv+o.hw;o.ia=Math.max(0,o.sd-o.abs);o.ra=Math.max(0,o.sd-o.yu-o.mu-o.conv);o.att=o.ia;o.rate=o.sd?o.ia/o.sd:null;
   return o;
 }
-const SUMK=['sd','sp','ap','yu','mu','ji','jo','gy','conv','hw','abs','att','dd','cd'];
-function sumStats(list){const o={};SUMK.forEach(k=>o[k]=0);list.forEach(x=>SUMK.forEach(k=>o[k]+=x[k]));o.rate=o.sd?o.att/o.sd:null;return o;}
+/* 단위기간(그 달) 80% 판정. 남은 날은 모두 출석한다고 보고 최대로 받을 수 있는 출석률을 셈
+   st: 'ok' 충족 · 'warn' 결석 1~2일 더 하면 미달 · 'fail' 이미 미달(끝난 달) 또는 남은 날 다 나와도 미달 */
+function unitRisk(s,m){
+  const [a,b]=monthRange(m),full=statStu(s,a,b);if(!full.sd)return null;
+  const done=b<TODAY,now=done?full:TODAY<a?null:statStu(s,a,TODAY);
+  const need=Math.ceil(full.sd*RATE_MIN-1e-9),left=full.ia-need;
+  const pend=full.ji+full.jo+full.gy-3*full.hw;/* 결석 1일로 바뀌기 전까지 쌓인 지각·조퇴·결과 (한 달 기준) */
+  const st=left<0?'fail':!done&&left<=1?'warn':'ok';
+  return {sd:full.sd,ia:full.ia,max:full.rate,need,left,pend,done,now,st,full};
+}
+const RISK_LAB={fail:'미달',warn:'위험',ok:'충족'};
+const riskTxt=r=>!r?'':r.st==='fail'?(r.done?'80% 미달':'남은 날 다 나와도 미달'):r.done?'80% 충족':'결석 '+(r.left+1)+'일 더 → 미달'+(r.pend?' · 지·조·결 '+(3-r.pend)+'회 더 = 결석 1일':'');
+const SUMK=['sd','sp','ap','yu','mu','ji','jo','gy','conv','hw','abs','ia','ra','att','dd','cd'];
+function sumStats(list){const o={};SUMK.forEach(k=>o[k]=0);list.forEach(x=>SUMK.forEach(k=>o[k]+=x[k]));o.rate=o.sd?o.ia/o.sd:null;return o;}
 /* 외부강사 시수 (교시 = 1시수, 수업 있는 교시만) */
 function lectHours(a,b){
   const out={};/* out[lid][ym][tid]=n */
@@ -1512,7 +1534,9 @@ function renderHeroA(){
   const sd=weekdays(a,b).filter(k=>sched(k,tid).ps.length).length;
   const stus=stuSorted(tid).map(s=>{const o=statStu(s,a,b<TODAY?b:TODAY);o.en=o.en||weekdays(a,b).some(k=>enrolled(s,k));return o;}).filter(o=>o.en);const sm=sumStats(stus);
   let lh=0;const L=lectHours(a,b);Object.values(L).forEach(x=>Object.values(x).forEach(y=>Object.entries(y).forEach(([t,n])=>{if(!tid||t===tid)lh+=n;})));
-  $('a-stat').innerHTML='<span title="훈련소정일수: 수업이 있는 날 ('+(tid?'이 직종':'전 직종 공통')+')"><b>'+sd+'</b>소정일</span><span><b>'+stus.length+'</b>재적</span><span title="결석 합계 (환산 포함)"><b>'+sm.abs+'</b>결석</span><span title="지각·조퇴·결과"><b>'+(sm.ji+sm.jo+sm.gy)+'</b>지·조·결</span><span title="외부강사 시수"><b>'+lh+'</b>강사 시수</span>';
+  $('a-stat').innerHTML='<span title="훈련소정일수: 수업이 있는 날 ('+(tid?'이 직종':'전 직종 공통')+')"><b>'+sd+'</b>소정일</span><span><b>'+stus.length+'</b>재적</span><span title="출석 인정 안 되는 결석 (무단 + 50%미만 + 환산, 유고 제외)"><b>'+sm.abs+'</b>결석</span><span title="지각·조퇴·결과"><b>'+(sm.ji+sm.jo+sm.gy)+'</b>지·조·결</span><span title="외부강사 시수"><b>'+lh+'</b>강사 시수</span>';
+  const rk=riskRows(au.mi,tid),nf=rk.filter(x=>x.r.st==='fail').length,nw=rk.filter(x=>x.r.st==='warn').length;
+  if(rk.length)$('a-stat').innerHTML+='<button class="rkb'+(nf+nw?' bad':'')+'" data-a="open" data-m="stats" title="출석률 80% 미달 '+nf+'명 · 위험 '+nw+'명 (이 달 단위기간 기준) · 눌러서 보기"><b>'+(nf+nw)+'</b>80% 미달·위험</button>';
 }
 function renderBarA(){
   let h='';
@@ -1667,7 +1691,8 @@ function mDay(){
   h+='<div class="form" style="margin-bottom:6px"><span class="meta">'+stus.length+'명 · 출석 아님 '+nOff+'명</span>'+(nOff?'<button class="btn" data-a="allok">모두 출석으로</button>':'')+'</div>';
   stus.forEach(s=>{
     const r=A.att[k+'|'+s.id]||{},e=evalDay(s,k);
-    h+='<div class="srow2"><div class="nm">'+esc(s.name)+'<small>'+(isDorm(s,k)?'기숙':'통학')+(s.cnp==='Y'?' · 취성패':'')+(s.no?' · '+esc(s.no)+'번':'')+'</small></div><div class="sts">';
+    const rk=unitRisk(s,{y:+k.slice(0,4),m:+k.slice(5,7)-1});
+    h+='<div class="srow2"><div class="nm">'+esc(s.name)+'<small>'+(isDorm(s,k)?'기숙':'통학')+(s.cnp==='Y'?' · 취성패':'')+(s.no?' · '+esc(s.no)+'번':'')+(s.govEnd&&k<=s.govEnd?' · 타 국비 기간':'')+'</small>'+(rk&&rk.st!=='ok'?'<span class="ab rk '+rk.st+'" title="'+esc(riskTxt(rk))+'">80% '+RISK_LAB[rk.st]+' · 최대 '+pct(rk.max)+'</span>':'')+'</div><div class="sts">';
     ST.forEach(t=>{h+='<button data-a="ast" data-sid="'+s.id+'" data-s="'+t+'" class="'+(e.st===t?'on':'')+'" aria-pressed="'+(e.st===t)+'">'+t+'</button>';});
     if(PART.includes(e.st)){h+='<span class="meta">빠진 교시</span>';sc.ps.forEach(p=>{const on=(r.p||[]).includes(p);h+='<button class="pp'+(on?' on':'')+'" data-a="ap" data-sid="'+s.id+'" data-p="'+p+'" aria-pressed="'+on+'" aria-label="'+p+'교시 빠짐">'+p+'</button>';});}
     if(e.conv)h+='<span class="res">→ 결석 처리 (출석 '+(e.n-e.miss)+'/'+e.n+'교시, 50% 미만)</span>';
@@ -1686,21 +1711,21 @@ function mRoster(){
     return h+'</div></div>';
   }
   if(au.tab==='paste'){
-    h+='<div class="blk"><h3>엑셀에서 복사 → 붙여넣기</h3><p class="help">열 순서: 이름 · 직종 · 입학일 · 수료일 · 통학(Y/N) · 기숙사 입소일 · 취성패(Y/N) · 번호 · 메모 '+tip('엑셀에서 칸을 골라 Ctrl+C → 아래에 Ctrl+V\n첫 줄이 "이름"으로 시작하면 제목줄로 보고 건너뛰어요\n없는 직종은 새로 만들어요\n날짜: 2026-12-01 · 2026.12.1 · 20261201 모두 돼요')+'</p>';
+    h+='<div class="blk"><h3>엑셀에서 복사 → 붙여넣기</h3><p class="help">열 순서: 이름 · 직종 · 입학일 · 수료일 · 통학(Y/N) · 기숙사 입소일 · 취성패(Y/N) · 번호 · 메모 · 타 국비 종료일 '+tip('엑셀에서 칸을 골라 Ctrl+C → 아래에 Ctrl+V\n첫 줄이 "이름"으로 시작하면 제목줄로 보고 건너뛰어요\n없는 직종은 새로 만들어요\n날짜: 2026-12-01 · 2026.12.1 · 20261201 모두 돼요')+'</p>';
     h+='<textarea class="fi code" id="paste-in" style="min-height:180px" placeholder="이름&#9;직종&#9;입학일&#9;수료일&#9;통학&#9;기숙사 입소일&#9;취성패"></textarea><div class="form" style="margin-top:10px"><button class="btn pri" data-a="pasteimp">학생 추가</button></div><div class="err" id="paste-err"></div></div>';
     return h+'</div>';
   }
   if(!A.tracks.length){h+='<div class="empty">직종을 먼저 추가하세요 <button class="btn" data-a="tab" data-v="trk">직종 탭</button></div>';return h+'</div>';}
-  h+='<div class="blk"><h3>학생 추가</h3><div class="form"><input class="fi" id="n-name" placeholder="이름" aria-label="이름" style="width:110px"><select class="fi" id="n-track" aria-label="직종">'+trackOpts(au.stuF||au.track)+'</select><label class="meta">입학 <input class="fi" type="date" id="n-admit" min="2026-01-01" max="'+AMAX+'" value="'+(TODAY<AMIN?AMIN:TODAY)+'"></label><label class="meta">수료 <input class="fi" type="date" id="n-complete" max="2028-12-31"></label><label class="meta">통학 <select class="fi" id="n-commute"><option>Y</option><option>N</option></select></label><label class="meta">기숙사 입소 <input class="fi" type="date" id="n-dorm" max="'+AMAX+'"></label><label class="meta">취성패 <select class="fi" id="n-cnp"><option>N</option><option>Y</option></select></label><button class="btn pri" data-a="sadd">추가</button></div><div class="err" id="s-err"></div></div>';
-  h+='<div class="a-bar"><span class="lbl">보기</span>'+segA('stuf',au.stuF,[['','전체']].concat(A.tracks.map(t=>[t.id,t.name])))+tip('통학 = 기숙사 입소 전 통학 여부\n기숙사 입소일을 넣으면 그날부터 기숙(통학 N)으로 셈\n취성패 Y → 훈련참여수당 0원')+'</div>';
+  h+='<div class="blk"><h3>학생 추가</h3><div class="form"><input class="fi" id="n-name" placeholder="이름" aria-label="이름" style="width:110px"><select class="fi" id="n-track" aria-label="직종">'+trackOpts(au.stuF||au.track)+'</select><label class="meta">입학 <input class="fi" type="date" id="n-admit" min="2026-01-01" max="'+AMAX+'" value="'+(TODAY<AMIN?AMIN:TODAY)+'"></label><label class="meta">수료 <input class="fi" type="date" id="n-complete" max="2028-12-31"></label><label class="meta">통학 <select class="fi" id="n-commute"><option>Y</option><option>N</option></select></label><label class="meta">기숙사 입소 <input class="fi" type="date" id="n-dorm" max="'+AMAX+'"></label><label class="meta">취성패 <select class="fi" id="n-cnp"><option>N</option><option>Y</option></select></label><label class="meta">타 국비 종료 <input class="fi" type="date" id="n-gov" max="'+AMAX+'"></label><button class="btn pri" data-a="sadd">추가</button></div><div class="err" id="s-err"></div></div>';
+  h+='<div class="a-bar"><span class="lbl">보기</span>'+segA('stuf',au.stuF,[['','전체']].concat(A.tracks.map(t=>[t.id,t.name])))+tip('통학 = 기숙사 입소 전 통학 여부\n기숙사 입소일을 넣으면 그날부터 기숙(통학 N)으로 셈\n취성패 Y → 훈련참여수당 0원\n타 국비 종료 = 다른 국비 지원이 끝나는 날 · 다음날부터 단위기간 시작 (그 전 날은 소정일·출석률에서 빠짐)')+'</div>';
   const list=stuSorted(au.stuF);
   if(!list.length)h+='<div class="empty">학생 없음</div>';
   else{
-    h+='<div class="tw"><table class="atbl"><thead><tr><th>번호</th><th>이름</th><th>직종</th><th>입학일</th><th>수료일</th><th>통학</th><th>기숙사 입소일</th><th>취성패</th><th>메모</th><th>상태</th><th><span class="sr">작업</span></th></tr></thead><tbody>';
+    h+='<div class="tw"><table class="atbl"><thead><tr><th>번호</th><th>이름</th><th>직종</th><th>입학일</th><th>수료일</th><th>통학</th><th>기숙사 입소일</th><th>취성패</th><th>타 국비 종료</th><th>메모</th><th>상태</th><th><span class="sr">작업</span></th></tr></thead><tbody>';
     list.forEach(s=>{
       const f=(fl,w,type)=>'<input class="fi" id="sf-'+fl+'-'+s.id+'" data-sid="'+s.id+'" data-f="'+fl+'"'+(type?' type="'+type+'"':'')+' value="'+esc(s[fl])+'" aria-label="'+fl+'"'+(w?' style="min-width:'+w+'px"':'')+'>';
       const yn=fl=>'<select class="fi" id="sf-'+fl+'-'+s.id+'" data-sid="'+s.id+'" data-f="'+fl+'" aria-label="'+fl+'"><option'+(s[fl]==='Y'?' selected':'')+'>Y</option><option'+(s[fl]==='N'?' selected':'')+'>N</option></select>';
-      h+='<tr><td>'+f('no',44)+'</td><td>'+f('name',90)+'</td><td><select class="fi" id="sf-track-'+s.id+'" data-sid="'+s.id+'" data-f="track" aria-label="직종">'+trackOpts(s.track)+'</select></td><td>'+f('admit',0,'date')+'</td><td>'+f('complete',0,'date')+'</td><td>'+yn('commute')+'</td><td>'+f('dorm',0,'date')+'</td><td>'+yn('cnp')+'</td><td>'+f('memo',120)+'</td><td class="meta">'+stuStatus(s)+(isDorm(s,TODAY)?' · 기숙':'')+'</td><td>'+(au.arm==='s:'+s.id?'<button class="btn danger arm" data-a="sdel" data-id="'+s.id+'">삭제 확인</button>':'<button class="ib" data-a="arm" data-v="s:'+s.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</td></tr>';
+      h+='<tr><td>'+f('no',44)+'</td><td>'+f('name',90)+'</td><td><select class="fi" id="sf-track-'+s.id+'" data-sid="'+s.id+'" data-f="track" aria-label="직종">'+trackOpts(s.track)+'</select></td><td>'+f('admit',0,'date')+'</td><td>'+f('complete',0,'date')+'</td><td>'+yn('commute')+'</td><td>'+f('dorm',0,'date')+'</td><td>'+yn('cnp')+'</td><td>'+f('govEnd',0,'date')+'</td><td>'+f('memo',120)+'</td><td class="meta">'+stuStatus(s)+(isDorm(s,TODAY)?' · 기숙':'')+'</td><td>'+(au.arm==='s:'+s.id?'<button class="btn danger arm" data-a="sdel" data-id="'+s.id+'">삭제 확인</button>':'<button class="ib" data-a="arm" data-v="s:'+s.id+'" aria-label="삭제"><svg class="i"><use href="#i-x"/></svg></button>')+'</td></tr>';
     });
     h+='</tbody></table></div>';
   }
@@ -1764,6 +1789,24 @@ function mDays(){
   return h+'</div></div>';
 }
 /* ---- 출결 분석 ---- */
+/* 그 달(mi) 학생별 80% 판정 목록 · 미달·위험이 위로 */
+function riskRows(mi,tid){
+  if(mi<0||!AM[mi])return [];const m=AM[mi],ord={fail:0,warn:1,ok:2};
+  return stuSorted(tid).map(s=>({s,r:unitRisk(s,m)})).filter(x=>x.r).sort((p,q)=>ord[p.r.st]-ord[q.r.st]);
+}
+function riskSection(mi,tid){
+  const rows=riskRows(mi,tid);if(!rows.length)return '';
+  const m=AM[mi],bad=rows.filter(x=>x.r.st!=='ok').length;
+  let h='<div class="sec">훈련참여수당 80% · '+m.y+'년 '+(m.m+1)+'월 '+tip('단위기간(그 달) 출석률 = 출석인정일수 ÷ 소정훈련일수\n80% 미만이면 훈련참여수당 없음\n최대 = 남은 수업일에 모두 출석했을 때\n허용 결석 = 80%를 지키며 더 빠질 수 있는 날\n위험 = 결석 1–2일 더 하면 미달\n지각·조퇴·결과 3회 = 결석 1일')+'</div>';
+  if(!bad)h+='<p class="help" style="margin:0 0 10px">미달·위험 학생 없음 ('+rows.length+'명 모두 충족 가능)</p>';
+  h+='<div class="tw"><table class="atbl risk"><thead><tr><th>판정</th><th>직종</th><th>이름</th><th class="r">소정일</th><th class="r">필요 출석</th><th class="r">현재 출석률</th><th class="r">최대 출석률</th><th class="r">허용 결석</th><th class="r">지·조·결 누적</th><th>메모</th></tr></thead><tbody>';
+  rows.forEach(({s,r})=>{
+    if(r.st==='ok'&&bad&&rows.length>12)return;/* 많을 때는 미달·위험만 */
+    h+='<tr class="rk-'+r.st+'"><td><span class="ab rk '+r.st+'">'+RISK_LAB[r.st]+'</span></td><td>'+esc(trackName(s.track))+'</td><td>'+esc(s.name)+(s.cnp==='Y'?' <span class="meta">취성패</span>':'')+'</td><td class="r">'+r.sd+'</td><td class="r">'+r.need+'일</td><td class="r'+(r.now&&r.now.rate!=null&&r.now.rate<RATE_MIN?' low':'')+'">'+(r.now?pct(r.now.rate):'–')+'</td><td class="r'+(r.max<RATE_MIN?' low':'')+'"><b>'+pct(r.max)+'</b></td><td class="r">'+(r.left<0?'<span class="low">'+r.left+'</span>':r.left+'일')+'</td><td class="r">'+r.pend+'/3</td><td class="meta">'+esc(riskTxt(r))+'</td></tr>';
+  });
+  if(bad&&rows.length>12&&rows.length>bad)h+='<tr><td colspan="10" class="meta">충족 '+(rows.length-bad)+'명 생략</td></tr>';
+  return h+'</tbody></table></div>';
+}
 function statRange(){const st=au.stat;const r=st.mode==='month'?monthRange(AM[st.mi]):st.mode==='all'?[AMIN,AMAX]:[st.from||AMIN,st.to||AMAX];if(st.upto&&r[1]>TODAY)r[1]=TODAY;return r;}
 function mStats(){
   const st=au.stat,[a,b]=statRange();
@@ -1774,14 +1817,15 @@ function mStats(){
   h+='<label class="chk"><input type="checkbox" id="st-upto"'+(st.upto?' checked':'')+'>오늘까지만 '+tip('켜면 오늘 이후 날짜는 세지 않아요\n(출결 기본값이 출석이라 미래 날짜가 출석으로 잡히는 것을 막음)')+'</label><span class="lbl">직종</span><select class="fi" id="st-track" style="width:auto" aria-label="직종">'+trackOpts(st.track,'전체')+'</select><span class="grow"></span><button class="btn pri" data-a="stexp">이 조건으로 엑셀</button></div>';
   const tr=st.track?A.tracks.filter(t=>t.id===st.track):A.tracks;
   if(b<a){h+='<div class="empty">아직 집계할 날이 없어요 · "오늘까지만"을 끄면 예정으로 볼 수 있어요</div>';return h+'</div>';}
-  h+='<div class="sec">학생별 '+tip('소정일 = 훈련소정일수 (재적 기간 중 수업 있는 날)\n출석일 = 소정일 − 결석 합계\n50%미만 = 출석 교시가 절반 미만이라 결석 처리된 날\n환산 = 지각·조퇴·결과 3회당 결석 1일 (달마다)\n출석률 80% 미만은 색으로 표시')+'</div>';
-  h+='<div class="tw"><table class="atbl"><thead><tr><th>직종</th><th>이름</th><th>구분</th><th>취성패</th><th class="r">소정일</th><th class="r">출석일</th><th class="r">출석률</th><th class="r">유고</th><th class="r">무단</th><th class="r">50%미만</th><th class="r">지각</th><th class="r">조퇴</th><th class="r">결과</th><th class="r">환산</th><th class="r">결석 계</th><th class="r">출석 교시</th><th class="r">통학 출석</th><th class="r">기숙 출석</th></tr></thead><tbody>';
-  const row=(c1,c2,c3,c4,o,sub)=>'<tr'+(sub?' class="sub"':'')+'><td>'+c1+'</td><td>'+c2+'</td><td>'+c3+'</td><td>'+c4+'</td><td class="r">'+o.sd+'</td><td class="r">'+o.att+'</td><td class="r'+(o.rate!=null&&o.rate<.8?' low':'')+'">'+pct(o.rate)+'</td><td class="r">'+o.yu+'</td><td class="r">'+o.mu+'</td><td class="r">'+o.conv+'</td><td class="r">'+o.ji+'</td><td class="r">'+o.jo+'</td><td class="r">'+o.gy+'</td><td class="r">'+o.hw+'</td><td class="r"><b>'+o.abs+'</b></td><td class="r">'+o.ap+'/'+o.sp+'</td><td class="r">'+o.cd+'</td><td class="r">'+o.dd+'</td></tr>';
+  h+=riskSection(st.mode==='month'?st.mi:AM.findIndex(m=>TODAY.startsWith(ymOf(m))),st.track);
+  h+='<div class="sec">학생별 '+tip('소정일 = 소정훈련일수 (단위기간 중 수업 있는 날)\n단위기간 = 그 달 1일–말일 · 입학 전, 타 국비 종료일까지는 빠짐\n출석인정 = 소정일 − 결석 계 (유고결석은 출석으로 인정)\n실출석 = 실제로 수업 들은 날 (유고결석 빼고 셈)\n결석 계 = 무단 + 50%미만 + 환산 (유고 제외)\n50%미만 = 출석 교시가 절반 미만이라 결석 처리된 날\n환산 = 지각·조퇴·결과 3회당 결석 1일 (달마다)\n출석률 = 출석인정 ÷ 소정일 · 80% 미만은 색으로 표시')+'</div>';
+  h+='<div class="tw"><table class="atbl"><thead><tr><th>직종</th><th>이름</th><th>구분</th><th>취성패</th><th class="r">소정일</th><th class="r">출석인정</th><th class="r">실출석</th><th class="r">출석률</th><th class="r">유고</th><th class="r">무단</th><th class="r">50%미만</th><th class="r">지각</th><th class="r">조퇴</th><th class="r">결과</th><th class="r">환산</th><th class="r">결석 계</th><th class="r">출석 교시</th><th class="r">통학 출석</th><th class="r">기숙 출석</th></tr></thead><tbody>';
+  const row=(c1,c2,c3,c4,o,sub)=>'<tr'+(sub?' class="sub"':'')+'><td>'+c1+'</td><td>'+c2+'</td><td>'+c3+'</td><td>'+c4+'</td><td class="r">'+o.sd+'</td><td class="r">'+o.ia+'</td><td class="r">'+o.ra+'</td><td class="r'+(o.rate!=null&&o.rate<RATE_MIN?' low':'')+'">'+pct(o.rate)+'</td><td class="r">'+o.yu+'</td><td class="r">'+o.mu+'</td><td class="r">'+o.conv+'</td><td class="r">'+o.ji+'</td><td class="r">'+o.jo+'</td><td class="r">'+o.gy+'</td><td class="r">'+o.hw+'</td><td class="r"><b>'+o.abs+'</b></td><td class="r">'+o.ap+'/'+o.sp+'</td><td class="r">'+o.cd+'</td><td class="r">'+o.dd+'</td></tr>';
   let any=false;const all=[];
   tr.forEach(t=>{const rows=stuSorted(t.id).map(s=>[s,statStu(s,a,b)]).filter(x=>x[1].en);if(!rows.length)return;any=true;
     rows.forEach(([s,o])=>{h+=row(esc(t.name),esc(s.name),isDorm(s,b<TODAY?b:TODAY>=a?TODAY:a)?'기숙':'통학',s.cnp==='Y'?'Y':'',o);all.push(o);});
     h+=row(esc(t.name)+' 소계','','','',sumStats(rows.map(x=>x[1])),true);});
-  if(!any)h+='<tr><td colspan="18" class="meta">이 기간 재적 학생 없음</td></tr>';
+  if(!any)h+='<tr><td colspan="19" class="meta">이 기간 재적 학생 없음</td></tr>';
   else if(tr.length>1)h+=row('전체','','','',sumStats(all),true);
   h+='</tbody></table></div>';
   /* 월별 출석률 */
@@ -1789,7 +1833,7 @@ function mStats(){
   if(ti>fi&&any){
     const ms=AM.slice(fi,ti+1);
     h+='<div class="sec">월별 출석률 · 결석</div><div class="tw"><table class="atbl"><thead><tr><th>직종</th><th>이름</th>'+ms.map(m=>'<th class="r">'+(m.y%100)+'.'+(m.m+1)+'</th>').join('')+'<th class="r">기간</th></tr></thead><tbody>';
-    tr.forEach(t=>stuSorted(t.id).forEach(s=>{const tot=statStu(s,a,b);if(!tot.en)return;h+='<tr><td>'+esc(t.name)+'</td><td>'+esc(s.name)+'</td>'+ms.map(m=>{const [x,y]=monthRange(m);const o=statStu(s,x<a?a:x,y>b?b:y);return '<td class="r'+(o.rate!=null&&o.rate<.8?' low':'')+'" title="결석 '+o.abs+' · 지각 '+o.ji+' · 조퇴 '+o.jo+' · 결과 '+o.gy+'">'+(o.sd?pct(o.rate)+(o.abs?' <span class="meta">('+o.abs+')</span>':''):'')+'</td>';}).join('')+'<td class="r'+(tot.rate!=null&&tot.rate<.8?' low':'')+'"><b>'+pct(tot.rate)+'</b></td></tr>';}));
+    tr.forEach(t=>stuSorted(t.id).forEach(s=>{const tot=statStu(s,a,b);if(!tot.en)return;h+='<tr><td>'+esc(t.name)+'</td><td>'+esc(s.name)+'</td>'+ms.map(m=>{const [x,y]=monthRange(m);const o=statStu(s,x<a?a:x,y>b?b:y);return '<td class="r'+(o.rate!=null&&o.rate<RATE_MIN?' low':'')+'" title="결석 '+o.abs+' · 지각 '+o.ji+' · 조퇴 '+o.jo+' · 결과 '+o.gy+'">'+(o.sd?pct(o.rate)+(o.abs?' <span class="meta">('+o.abs+')</span>':''):'')+'</td>';}).join('')+'<td class="r'+(tot.rate!=null&&tot.rate<RATE_MIN?' low':'')+'"><b>'+pct(tot.rate)+'</b></td></tr>';}));
     h+='</tbody></table></div><p class="help" style="margin-top:8px">괄호 = 결석 일수 (환산 포함)</p>';
   }
   const fi2=fi<0?0:fi,ti2=ti<0?AM.length-1:ti;
@@ -1896,8 +1940,8 @@ const XL=(function(){
 })();
 
 /* ---------- 엑셀 시트 만들기 ---------- */
-const STAT_COLS=[['소정일','sd'],['출석일','att'],['출석률','rate'],['유고결석','yu'],['무단결석','mu'],['50%미만 결석','conv'],['지각','ji'],['조퇴','jo'],['결과','gy'],['환산결석','hw'],['결석 계','abs'],['소정 교시','sp'],['출석 교시','ap'],['통학 출석일','cd'],['기숙 출석일','dd']];
-const statCells=(o,tot)=>STAT_COLS.map(([,k])=>k==='rate'?{v:o.rate==null?'':o.rate,s:tot?'totpct':o.rate!=null&&o.rate<.8?'low':'pct'}:{v:o[k],s:tot?'totn':'n'});
+const STAT_COLS=[['소정훈련일수','sd'],['출석인정일수','ia'],['실출석일수','ra'],['출석률','rate'],['유고결석','yu'],['무단결석','mu'],['50%미만 결석','conv'],['지각','ji'],['조퇴','jo'],['결과','gy'],['환산결석','hw'],['결석 계(유고 제외)','abs'],['소정 교시','sp'],['출석 교시','ap'],['통학 출석일','cd'],['기숙 출석일','dd']];
+const statCells=(o,tot)=>STAT_COLS.map(([,k])=>k==='rate'?{v:o.rate==null?'':o.rate,s:tot?'totpct':o.rate!=null&&o.rate<RATE_MIN?'low':'pct'}:{v:o[k],s:tot?'totn':'n'});
 const ymLab=m=>m.y+'년 '+(m.m+1)+'월',ymShort=m=>(m.y%100)+'.'+pad(m.m+1);
 function buildWorkbook(x){
   const ms=AM.slice(Math.min(x.from,x.to),Math.max(x.from,x.to)+1);
@@ -1969,7 +2013,7 @@ function buildWorkbook(x){
   /* 3. 월별 통계 */
   const statHead=pre=>pre.map(l=>({v:l,s:'h'})).concat(STAT_COLS.map(([l])=>({v:l,s:'h'})));
   if(x.sh.mstat){
-    const rows=[[{v:'월별 출결 통계'+(x.upto?' ('+TODAY.replace(/-/g,'.')+' 기준)':''),s:'title'}],[{v:'소정일 = 훈련소정일수 · 출석일 = 소정일 − 결석 계 · 환산결석 = 지각·조퇴·결과 3회당 1일(달마다) · 50%미만 결석 = 출석 교시가 절반 미만인 날',s:'note'}]],heights={0:24};
+    const rows=[[{v:'월별 출결 통계'+(x.upto?' ('+TODAY.replace(/-/g,'.')+' 기준)':''),s:'title'}],[{v:'출석률 = 출석인정일수 ÷ 소정훈련일수 · 출석인정일수 = 소정훈련일수 − 결석 계 (유고결석은 출석 인정) · 실출석일수 = 유고결석도 뺀 날 · 결석 계 = 무단 + 50%미만 + 환산 · 환산결석 = 지각·조퇴·결과 3회당 1일(달마다) · 타 국비 종료일까지는 단위기간에서 빠짐',s:'note'}]],heights={0:24};
     ms.forEach(m=>{const [a,b]=monthRange(m);rows.push([]);rows.push([{v:ymLab(m),s:'title'}]);rows.push(statHead(['직종','이름','구분(월말)','취성패']));heights[rows.length-1]=30;const all=[];
       tr.forEach(t=>{const list=stuList(t,a,b).map(s=>[s,ST2(s,a,b)]);if(!list.length)return;
         list.forEach(([s,o])=>{rows.push([{v:t.name,s:'l'},{v:s.name,s:'l'},{v:isDorm(s,asOf(a,b))?'기숙':'통학',s:'c'},{v:s.cnp==='Y'?'Y':'N',s:'c'}].concat(statCells(o)));all.push(o);});
@@ -1994,7 +2038,7 @@ function buildWorkbook(x){
     ms.forEach((m,i)=>{const c=2+i*2;h1[c]={v:ymShort(m),s:'h'};h1[c+1]={v:'',s:'h'};merges.push([2,c,2,c+1]);h2[c]={v:'출석률',s:'h'};h2[c+1]={v:'결석',s:'h'};});
     const E=2+ms.length*2;h1[E]={v:'기간',s:'h'};h1[E+1]={v:'',s:'h'};merges.push([2,E,2,E+1],[2,0,3,0],[2,1,3,1]);h2[E]={v:'출석률',s:'h'};h2[E+1]={v:'결석',s:'h'};rows.push(h1,h2);
     tr.forEach(t=>stuList(t,A0,B0).forEach(s=>{const row=[{v:t.name,s:'l'},{v:s.name,s:'l'}];
-      ms.forEach((m,i)=>{const [a,b]=monthRange(m),o=ST2(s,a,b);row[2+i*2]={v:o.sd?o.rate:'',s:o.rate!=null&&o.rate<.8?'low':'pct'};row[3+i*2]={v:o.sd?o.abs:'',s:'n'};});
+      ms.forEach((m,i)=>{const [a,b]=monthRange(m),o=ST2(s,a,b);row[2+i*2]={v:o.sd?o.rate:'',s:o.rate!=null&&o.rate<RATE_MIN?'low':'pct'};row[3+i*2]={v:o.sd?o.abs:'',s:'n'};});
       const o=ST2(s,A0,B0);row[E]={v:o.rate==null?'':o.rate,s:'totpct'};row[E+1]={v:o.abs,s:'totn'};rows.push(row);}));
     sheets.push({name:'월별 출석률',rows,fit:1,merges,freeze:[4,2],cols:[10,9].concat(Array(ms.length*2+2).fill(7.5))});
   }
@@ -2034,18 +2078,20 @@ function buildWorkbook(x){
   }
   /* 8. 수당 기초자료 */
   if(x.sh.allow){
-    const rows=[[{v:'훈련수당 기초자료',s:'title'}],[{v:'통학/기숙 출석일 = 결석이 아닌 날을 그날의 통학·기숙 여부로 나눠 셈 · 취성패 Y는 훈련참여수당 0원 · 수당 금액 칸은 직접 입력',s:'note'}]];
+    const rows=[[{v:'훈련수당 기초자료',s:'title'}],[{v:'출석률 = 출석인정일수 ÷ 소정훈련일수 · 80% 미만이면 훈련참여수당 없음 · 통학/기숙 출석일 = 출석인정일을 그날의 통학·기숙 여부로 나눠 셈 · 취성패 Y는 훈련참여수당 0원 · 수당 금액 칸은 직접 입력 · 판정은 그 달 전체 기준(남은 날은 출석으로 가정)',s:'note'}]];
     ms.forEach(m=>{const [a,b]=monthRange(m);rows.push([]);rows.push([{v:ymLab(m),s:'title'}]);
-      rows.push(['직종','이름','통학(입소 전)','기숙사 입소일','구분(월말)','취성패','소정일','출석일','출석률','통학 출석일','기숙 출석일','훈련참여수당(원)','비고'].map(v=>({v,s:'h'})));
-      tr.forEach(t=>stuList(t,a,b).forEach(s=>{const o=ST2(s,a,b);rows.push([{v:t.name,s:'l'},{v:s.name,s:'l'},{v:s.commute,s:'c'},{v:s.dorm,s:'c'},{v:isDorm(s,asOf(a,b))?'기숙':'통학',s:'c'},{v:s.cnp==='Y'?'Y':'N',s:'c'},{v:o.sd,s:'n'},{v:o.att,s:'n'},{v:o.rate==null?'':o.rate,s:o.rate!=null&&o.rate<.8?'low':'pct'},{v:o.cd,s:'n'},{v:o.dd,s:'n'},{v:s.cnp==='Y'?0:'',s:'n'},{v:s.cnp==='Y'?'취성패 · 훈련참여수당 0원':'',s:'l'}]);}));
+      rows.push(['직종','이름','통학(입소 전)','기숙사 입소일','구분(월말)','취성패','타 국비 종료','소정훈련일수','출석인정일수','실출석일수','출석률','80% 판정','통학 출석일','기숙 출석일','훈련참여수당(원)','비고'].map(v=>({v,s:'h'})));
+      tr.forEach(t=>stuList(t,a,b).forEach(s=>{const o=ST2(s,a,b),rk=unitRisk(s,m),fail=rk&&rk.st==='fail';
+        const note=[s.cnp==='Y'?'취성패 · 훈련참여수당 0원':'',fail?(rk.done?'출석률 80% 미달 · 훈련참여수당 없음':'남은 날 다 나와도 80% 미달'):rk&&rk.st==='warn'?riskTxt(rk):''].filter(Boolean).join(' · ');
+        rows.push([{v:t.name,s:'l'},{v:s.name,s:'l'},{v:s.commute,s:'c'},{v:s.dorm,s:'c'},{v:isDorm(s,asOf(a,b))?'기숙':'통학',s:'c'},{v:s.cnp==='Y'?'Y':'N',s:'c'},{v:s.govEnd,s:'c'},{v:o.sd,s:'n'},{v:o.ia,s:'n'},{v:o.ra,s:'n'},{v:o.rate==null?'':o.rate,s:o.rate!=null&&o.rate<RATE_MIN?'low':'pct'},{v:rk?RISK_LAB[rk.st]:'',s:'c'},{v:o.cd,s:'n'},{v:o.dd,s:'n'},{v:s.cnp==='Y'||fail?0:'',s:'n'},{v:note,s:'l'}]);}));
     });
-    sheets.push({name:'수당 기초자료',rows,fit:1,freeze:[0,2],cols:[10,9,10,12,9,7,7,7,8,9,9,14,24]});
+    sheets.push({name:'수당 기초자료',rows,fit:1,freeze:[0,2],cols:[10,9,10,12,9,7,12,9,9,9,8,8,9,9,14,34]});
   }
   /* 9. 명부 */
   if(x.sh.roster){
-    const r1=[[{v:'학생부',s:'title'}],[],['번호','직종','이름','입학일','수료일','통학(입소 전)','기숙사 입소일','취성패','상태','메모'].map(v=>({v,s:'h'}))];
-    tr.forEach(t=>stuSorted(t.id).forEach(s=>r1.push([{v:s.no,s:'c'},{v:t.name,s:'l'},{v:s.name,s:'l'},{v:s.admit,s:'c'},{v:s.complete,s:'c'},{v:s.commute,s:'c'},{v:s.dorm,s:'c'},{v:s.cnp,s:'c'},{v:stuStatus(s),s:'c'},{v:s.memo,s:'l'}])));
-    sheets.push({name:'학생부',rows:r1,fit:1,freeze:[3,0],cols:[6,10,10,12,12,11,13,7,9,30]});
+    const r1=[[{v:'학생부',s:'title'}],[],['번호','직종','이름','입학일','수료일','통학(입소 전)','기숙사 입소일','취성패','타 국비 종료','상태','메모'].map(v=>({v,s:'h'}))];
+    tr.forEach(t=>stuSorted(t.id).forEach(s=>r1.push([{v:s.no,s:'c'},{v:t.name,s:'l'},{v:s.name,s:'l'},{v:s.admit,s:'c'},{v:s.complete,s:'c'},{v:s.commute,s:'c'},{v:s.dorm,s:'c'},{v:s.cnp,s:'c'},{v:s.govEnd,s:'c'},{v:stuStatus(s),s:'c'},{v:s.memo,s:'l'}])));
+    sheets.push({name:'학생부',rows:r1,fit:1,freeze:[3,0],cols:[6,10,10,12,12,11,13,7,12,9,30]});
     const r2=[[{v:'외부강사 명단',s:'title'}],[],['이름','과목','연락처','메모'].map(v=>({v,s:'h'}))];
     A.lecturers.forEach(l=>r2.push([{v:l.name,s:'l'},{v:l.subject,s:'l'},{v:l.phone,s:'l'},{v:l.memo,s:'l'}]));
     sheets.push({name:'강사 명단',rows:r2,fit:1,cols:[12,18,16,30]});
@@ -2064,7 +2110,7 @@ function doExport(){
   const name='출결_'+ymShort(f).replace('.','')+(f!==t?'-'+ymShort(t).replace('.',''):'')+(x.track?'_'+trackName(x.track):'')+'.xlsx';
   download(name,XL.book(sheets));toast('엑셀 '+sheets.length+'개 시트 저장');
 }
-window.__attTest={buildWorkbook,book:s=>XL.book(s),get A(){return A;},set A(v){A=normA(v);SC.clear();},sampleA,statStu,evalDay,sched,au};
+window.__attTest={buildWorkbook,book:s=>XL.book(s),get A(){return A;},set A(v){A=normA(v);SC.clear();},sampleA,statStu,unitRisk,evalDay,sched,au};
 
 /* ---------- 붙여넣기로 학생 추가 ---------- */
 function normDate(v){
@@ -2083,9 +2129,9 @@ function pasteImport(text){
   lines.forEach((c,i)=>{
     const name=(c[0]||'').trim();if(!name)return;
     const tn=(c[1]||'').trim()||'(미지정)';let t=A.tracks.find(x=>x.name===tn);if(!t){t={id:uid(),name:tn};A.tracks.push(t);}
-    const admit=normDate(c[2]),complete=normDate(c[3]),dorm=normDate(c[5]);
-    if(admit===null||complete===null||dorm===null){bad.push(i+1);return;}
-    A.students.push({id:uid(),name,track:t.id,admit:admit||'',complete:complete||'',commute:yn(c[4],'Y'),dorm:dorm||'',cnp:yn(c[6],'N'),no:(c[7]||'').trim(),memo:(c[8]||'').trim()});n++;
+    const admit=normDate(c[2]),complete=normDate(c[3]),dorm=normDate(c[5]),govEnd=normDate(c[9]);
+    if(admit===null||complete===null||dorm===null||govEnd===null){bad.push(i+1);return;}
+    A.students.push({id:uid(),name,track:t.id,admit:admit||'',complete:complete||'',commute:yn(c[4],'Y'),dorm:dorm||'',cnp:yn(c[6],'N'),govEnd:govEnd||'',no:(c[7]||'').trim(),memo:(c[8]||'').trim()});n++;
   });
   return {n,bad};
 }
@@ -2113,7 +2159,7 @@ document.addEventListener('click',e=>{
     case 'track':au.track=v;au.sel.clear();renderA();break;
     case 'view':au.view=v;au.sel.clear();if(v==='week'){au.wk=monOf(defaultDayA());if(!au.track&&A.tracks.length)au.track=A.tracks[0].id;}renderA();break;
     case 'day':if(e.target.closest('.ast')&&e.target.closest('.wsum'))break;au.day=t.dataset.k;au.fk=au.day;au.dayTrack=au.track;openAM('day');break;
-    case 'open':openAM(t.dataset.m,{tab:null});break;
+    case 'open':if(t.classList.contains('rkb'))Object.assign(au.stat,{mode:'month',mi:au.mi,track:au.track});openAM(t.dataset.m,{tab:null});break;
     case 'closem':closeAM();break;
     case 'tab':au.tab=v;au.arm=null;renderAM();{const n=$('atab-'+v);n&&n.focus();}break;
     case 'sample':A=sampleA();saveA();au.track='';closeAM();renderA();toast('예시 데이터를 넣었어요');break;
@@ -2149,7 +2195,7 @@ document.addEventListener('click',e=>{
     case 'tup':{const i=A.tracks.findIndex(x=>x.id===t.dataset.id);if(i>0){[A.tracks[i-1],A.tracks[i]]=[A.tracks[i],A.tracks[i-1]];saveA();renderAM();renderA();}break;}
     case 'tdel':{const id=t.dataset.id,gone=new Set(A.students.filter(s=>s.track===id).map(s=>s.id));A.tracks=A.tracks.filter(x=>x.id!==id);A.students=A.students.filter(s=>s.track!==id);A.offs=A.offs.filter(o=>o.track!==id);Object.keys(A.lect).forEach(k=>{if(k.split('|')[1]===id)delete A.lect[k];});Object.keys(A.att).forEach(k=>{if(gone.has(k.split('|')[1]))delete A.att[k];});au.arm=null;saveA();renderAM();renderA();toast('직종을 지웠어요');break;}
     case 'sadd':{const nm=$('n-name').value.trim(),er=$('s-err');if(!nm){er.textContent='이름 필요';break;}
-      const s={id:uid(),name:nm,track:$('n-track').value,no:String(A.students.filter(x=>x.track===$('n-track').value).length+1),admit:$('n-admit').value,complete:$('n-complete').value,commute:$('n-commute').value,dorm:$('n-dorm').value,cnp:$('n-cnp').value,memo:''};
+      const s={id:uid(),name:nm,track:$('n-track').value,no:String(A.students.filter(x=>x.track===$('n-track').value).length+1),admit:$('n-admit').value,complete:$('n-complete').value,commute:$('n-commute').value,dorm:$('n-dorm').value,cnp:$('n-cnp').value,govEnd:$('n-gov').value,memo:''};
       if(s.complete&&s.admit&&s.complete<s.admit){er.textContent='수료일이 입학일보다 빨라요';break;}
       A.students.push(s);saveA();renderAM();renderA();const f=$('n-name');if(f){f.value='';f.focus();}toast(nm+' 추가');break;}
     case 'sdel':{const id=t.dataset.id;A.students=A.students.filter(s=>s.id!==id);Object.keys(A.att).forEach(k=>{if(k.split('|')[1]===id)delete A.att[k];});au.arm=null;saveA();renderAM();renderA();break;}
