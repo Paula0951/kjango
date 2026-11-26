@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 출석률·훈련수당 규칙 테스트: node tools/verify-attendance-rate.js  (모든 줄 PASS, ERRORS [] 이면 통과)
 // 출석인정일수(유고 = 출석 인정) · 실출석일수(지각·조퇴·결과 날은 셈) · 환산결석 · 타 국비 종료일 · 80% 판정
-// 훈련참여수당(정액/일할/상한/직접 지정) · 교통비(통학인 날 실출석, 유고 없음) · 통학·기숙 변경 이력 · 50% 미만 안내창 · 학생별 화면 · 엑셀
+// 훈련참여수당(정액/일할/상한/직접 지정, 80% 미만 0원) · 교통비(통학인 날 실출석 × 2,500, 단위기간 최대 50,000, 80% 미만이어도 지급, 유고 없음) · 통학·기숙 변경 이력 · 50% 미만 안내창 · 학생별 화면 · 엑셀
 // 시계 2026-12-10 10:00. 2026년 12월 소정일 = 12/1–12/18 평일 14일 (12/21부터 동계 방학) → 일할. 2027년 1월 단위기간은 방학 뒤 1/11부터
 const {chromium}=require('playwright');const path=require('path');const ROOT=path.resolve(__dirname,'..');
 (async()=>{const b=await chromium.launch();const pg=await b.newPage({viewport:{width:1440,height:900}});const errs=[];
@@ -26,20 +26,20 @@ const r=await pg.evaluate(()=>{const T=window.__attTest;
     p:{s5:pay('s5',dec),s3:pay('s3',dec),s7:pay('s7',dec),s8:pay('s8',dec),c1:T.payStu(S('c1'),dec),s5f:pay('s5',feb)},
     jan:T.unitInfo(S('s5'),jan),feb:T.unitInfo(S('s5'),feb),d1:S('d1').moves};
   const fsd=out.p.s5f[4];T.A.unitType['2027-02|s5']='pro';const A2=JSON.parse(JSON.stringify(T.A));T.A=A2;out.s5fo=pay('s5',feb);out.fsd=fsd;
-  T.A.pay.cap=120000;out.cap=pay('s5',dec);T.A.pay.cap=200000;
+  T.A.pay.cap=120000;T.A.pay.fare=5000;out.cap=pay('s5',dec);T.A.pay.cap=200000;T.A.pay.fare=2500;
   return out;});
 ok('s1 소정14 · 인정12 · 실출석11 (지각 날은 셈) · 유고2 · 무단1 · 지각4 · 환산1 · 결석계2 · 12/14',JSON.stringify(r.s1)===JSON.stringify([14,12,11,2,1,4,1,2,0.8571,11]),r.s1);
 ok('s2 타 국비 12/4 종료 → 소정 10, 12/2 무단은 안 셈',r.s2.sd===10&&r.s2.mu===1&&r.s2.ia===9,[r.s2.sd,r.s2.mu,r.s2.ia]);
 ok('판정: s1 위험 · s3 미달 · s4 위험 · s5 충족 · s6 없음',r.r.s1[0]==='warn'&&r.r.s3[0]==='fail'&&r.r.s4[0]==='warn'&&r.r.s5[0]==='ok'&&r.r.s6===null,r.r);
 ok('12월(방학 있음) s5 일할: 14일 × 10,000 = 140,000 + 교통비 14 × 2,500',JSON.stringify(r.p.s5)===JSON.stringify(['pro',140000,35000,175000,14,14]),r.p.s5);
-ok('s3 80% 미달 → 참여수당·교통비 0원',r.p.s3[1]===0&&r.p.s3[2]===0,r.p.s3);
+ok('s3 80% 미달 → 참여수당 0원, 교통비는 실출석 9일 × 2,500',r.p.s3[1]===0&&r.p.s3[2]===22500,r.p.s3);
 ok('s7 12/7 기숙사 입소 → 교통비는 통학 4일만',r.p.s7[5]===4&&r.p.s7[2]===10000,r.p.s7);
 ok('s8 유고결석 날은 교통비 없음 (출석률은 100%)',r.p.s8[5]===13&&r.p.s8[2]===32500,r.p.s8);
 ok('취성패 c1: 수당 계산 안 함, 판정은 있음',r.p.c1.part===null&&r.p.c1.total===null&&r.p.c1.risk.st==='fail');
 ok('1월: 방학 뒤 1/11부터 단위기간 · 일할',r.jan.first==='2027-01-11'&&r.jan.partial&&r.jan.why.join()==='방학',r.jan);
-ok('2월: 그 달 전체 → 정액 200,000',!r.feb.partial&&r.p.s5f[0]==='full'&&r.p.s5f[1]===200000,r.p.s5f);
+ok('2월: 그 달 전체 → 정액 200,000 · 교통비 18일 × 2,500',!r.feb.partial&&r.p.s5f[0]==='full'&&r.p.s5f[1]===200000&&r.p.s5f[2]===45000,r.p.s5f);
 ok('2월 일할로 직접 지정 → min(상한, 실출석 × 10,000), 백업에도 남음',r.s5fo[0]==='pro'&&r.s5fo[1]===Math.min(200000,r.fsd*10000),r.s5fo);
-ok('일할 상한 120,000 적용',r.cap[1]===120000,r.cap);
+ok('일할 상한 120,000 · 교통비 14일 × 5,000 → 상한 50,000',r.cap[1]===120000&&r.cap[2]===50000,r.cap);
 ok('예전 기숙사 입소일 → 변경 이력으로 옮김',JSON.stringify(r.d1)==='[{"d":"2026-12-14","t":"D"}]',r.d1);
 // 화면: 학생별
 await pg.click('#att [data-mode=admin]');await pg.click('#app [data-mode=att]');
@@ -73,5 +73,5 @@ await pg.keyboard.press('Escape');
 const wb=await pg.evaluate(()=>{const T=window.__attTest,sh=T.buildWorkbook({from:0,to:0,track:'',upto:1,sh:{allow:1}});
   const al=sh.find(s=>s.name==='훈련수당 계산'),hi=al.rows.findIndex(r=>r[0]&&r[0].v==='직종'),h=al.rows[hi].map(c=>c.v),row=n=>al.rows.find(r=>r[1]&&r[1].v===n),col=l=>h.indexOf(l);
   return {s3:[row('s3')[col('80% 판정')].v,row('s3')[col('훈련수당 합계')].v],s8:[row('s8')[col('교통비')].v,row('s8')[col('계산 방식')].v],c1:row('c1')[col('훈련참여수당')].v,tot:!!al.rows.find(r=>r[0]&&r[0].v==='합계')};});
-ok('엑셀: s3 미달 0원 · s8 교통비 32,500 일할 · 취성패 빈칸 · 합계 줄',wb.s3[0]==='미달'&&wb.s3[1]===0&&wb.s8[0]===32500&&wb.s8[1]==='일할'&&wb.c1===''&&wb.tot,wb);
+ok('엑셀: s3 미달 → 교통비만 22,500 · s8 교통비 32,500 일할 · 취성패 빈칸 · 합계 줄',wb.s3[0]==='미달'&&wb.s3[1]===22500&&wb.s8[0]===32500&&wb.s8[1]==='일할'&&wb.c1===''&&wb.tot,wb);
 console.log('ERRORS',JSON.stringify(errs));await b.close();})();

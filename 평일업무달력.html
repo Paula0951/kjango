@@ -2512,7 +2512,7 @@ const isWk=k=>{const w=P(k).getDay();return w===0||w===6;};
 const pct=v=>v==null?'–':(Math.round(v*1000)/10)+'%';
 
 /* ---------- state ---------- */
-const DEF_PAY={full:200000,day:10000,cap:200000,fare:2500};/* 훈련참여수당 정액 · 일할 1일 · 일할 상한 · 교통비 1일 */
+const DEF_PAY={full:200000,day:10000,cap:200000,fare:2500,fareCap:50000};/* 훈련참여수당 정액 · 일할 1일 · 일할 상한 · 교통비 1일 · 교통비 단위기간 상한 */
 function freshA(){return {tracks:[],students:[],lecturers:[],periods:DEF_P.map(([s,e])=>({s,e})),kinds:defKinds(),offs:[],lect:{},subjects:defSubjects(),spec:{},att:{},disabledHol:[],pay:Object.assign({},DEF_PAY),unitType:{}};}
 /* 통학·기숙 변경 이력: [{d:'YYYY-MM-DD', t:'C'|'D'}] · 예전 기숙사 입소일(dorm)은 D 로 옮김 */
 function normMoves(x){const out={};(Array.isArray(x.moves)?x.moves:[]).forEach(m=>{if(m&&okDate(m.d)&&(m.t==='C'||m.t==='D'))out[m.d]=m.t;});if(okDate(x.dorm)&&!out[x.dorm])out[x.dorm]='D';return Object.keys(out).sort().map(d=>({d,t:out[d]}));}
@@ -2648,14 +2648,14 @@ function unitInfo(s,m){
 }
 const won=v=>v==null?'–':v.toLocaleString('ko-KR')+'원';
 const UT_LAB={full:'정액',pro:'일할'};
-/* 훈련수당 = 훈련참여수당 + 교통비 (취성패 참여자는 계산 안 함). 출석률 80% 미만이면 둘 다 0원
+/* 훈련수당 = 훈련참여수당 + 교통비 (취성패 참여자는 계산 안 함). 출석률 80% 미만이면 참여수당만 0원 (교통비는 그대로)
    참여수당: 정액(그 달 전체가 단위기간) 또는 일할(실출석일수 × 1일 금액, 상한) · 교통비: 통학인 날 실출석일 × 1일 금액
    진행 중인 달은 남은 날을 출석으로 보고 계산한 예상 금액 (est) */
 function payStu(s,m){
   const u=unitInfo(s,m);if(!u)return null;
   const [a,b]=monthRange(m),o=statStu(s,a,b),now=b<TODAY||a>TODAY?o:statStu(s,a,TODAY),ov=A.unitType[ymOf(m)+'|'+s.id]||'';
   const type=ov||(u.partial?'pro':'full'),ok=o.rate!=null&&o.rate>=RATE_MIN,P=A.pay,cnp=s.cnp==='Y';
-  const part=cnp?null:!ok?0:type==='full'?P.full:Math.min(P.cap,o.ra*P.day),fare=cnp?null:!ok?0:o.cd*P.fare;
+  const part=cnp?null:!ok?0:type==='full'?P.full:Math.min(P.cap,o.ra*P.day),fare=cnp?null:Math.min(P.fareCap,o.cd*P.fare);/* 교통비는 80% 미만이어도 지급 */
   return {u,o,now,type,ov,ok,cnp,part,fare,total:cnp?null:part+fare,est:b>=TODAY&&a<=TODAY,future:a>TODAY,risk:unitRisk(s,m)};
 }
 const unitShort=u=>{const a=P(u.first),b=P(u.last);return (a.getMonth()+1)+'/'+a.getDate()+'–'+(a.getMonth()===b.getMonth()?'':(b.getMonth()+1)+'/')+b.getDate();};
@@ -3064,7 +3064,7 @@ function renderStuView(){
   if(!rows.length){$('a-body').innerHTML=h+'<div class="empty">이 달 재적 학생 없음</div></div>';return;}
   const est=rows[0].p.est,fut=rows[0].p.future,pays=rows.filter(x=>!x.p.cnp),paid=pays.filter(x=>x.p.ok);
   const anyLow=rows.some(x=>(x.p.est?x.p.now:x.p.o).low),nf=rows.filter(x=>x.p.risk&&x.p.risk.st==='fail').length,nw=rows.filter(x=>x.p.risk&&x.p.risk.st==='warn').length,sum=k=>pays.reduce((q,x)=>q+x.p[k],0);
-  h+='<div class="sv-sum" role="status"><span><b>'+rows.length+'</b>명</span><span><b'+(nf?' class="low"':'')+'>'+nf+'</b>80% 미달</span><span><b>'+nw+'</b>위험</span><span title="취성패가 아니고 출석률 80% 이상"><b>'+paid.length+'</b>/ '+pays.length+'명 지급</span><span><b>'+won(sum('part'))+'</b>훈련참여수당</span><span><b>'+won(sum('fare'))+'</b>교통비</span><span><b>'+won(sum('total'))+'</b>합계'+(est?' (예상)':fut?' (예정)':'')+'</span><span class="grow"></span><button class="btn" data-a="open" data-m="pay">수당 금액</button>'+tip('출석률 = 출석인정일수 ÷ 소정훈련일수 (80% 미만이면 훈련수당 없음)\n출석인정 = 소정일 − 무단 − 환산 (유고결석은 출석 인정)\n실출석 = 유고·무단을 뺀 날 (지각·조퇴·결과 날은 셈)\n환산 = 지각·조퇴·결과 3회당 결석 1일\n\n훈련참여수당: 그 달 전체가 단위기간이면 정액, 방학·입학·수료·타 국비로 일부면 실출석일수 × 1일 금액 (상한)\n교통비: 통학인 날 실출석일 × 1일 금액 · 기숙인 날·유고결석 날은 없음\n취성패 참여자는 출석률만 보고 수당은 계산 안 함\n진행 중인 달: 출석률은 오늘까지, 금액은 남은 날을 출석으로 본 예상\n\n이름을 누르면 학생 카드 (통학·기숙 변경, 계산 방식 지정, 달별 내역)','r')+'</div>';
+  h+='<div class="sv-sum" role="status"><span><b>'+rows.length+'</b>명</span><span><b'+(nf?' class="low"':'')+'>'+nf+'</b>80% 미달</span><span><b>'+nw+'</b>위험</span><span title="훈련참여수당 받는 학생 (취성패가 아니고 출석률 80% 이상) · 교통비는 출석률과 상관없이 지급"><b>'+paid.length+'</b>/ '+pays.length+'명 참여수당</span><span><b>'+won(sum('part'))+'</b>훈련참여수당</span><span><b>'+won(sum('fare'))+'</b>교통비</span><span><b>'+won(sum('total'))+'</b>합계'+(est?' (예상)':fut?' (예정)':'')+'</span><span class="grow"></span><button class="btn" data-a="open" data-m="pay">수당 금액</button>'+tip('출석률 = 출석인정일수 ÷ 소정훈련일수 (80% 미만이면 훈련참여수당 0원)\n출석인정 = 소정일 − 무단 − 환산 (유고결석은 출석 인정)\n실출석 = 유고·무단을 뺀 날 (지각·조퇴·결과 날은 셈)\n환산 = 지각·조퇴·결과 3회당 결석 1일\n\n훈련참여수당: 그 달 전체가 단위기간이면 정액, 방학·입학·수료·타 국비로 일부면 실출석일수 × 1일 금액 (상한)\n교통비: 통학인 날 실출석일 × 1일 금액, 단위기간 상한 · 출석률과 상관없이 지급 · 기숙인 날·유고결석 날은 없음\n취성패 참여자는 출석률만 보고 수당은 계산 안 함\n진행 중인 달: 출석률은 오늘까지, 금액은 남은 날을 출석으로 본 예상\n\n이름을 누르면 학생 카드 (통학·기숙 변경, 계산 방식 지정, 달별 내역)','r')+'</div>';
   h+='<div class="tw"><table class="atbl svt"><thead><tr><th>판정</th><th>직종</th><th>이름</th><th>단위기간</th><th class="r">소정일</th><th class="r">출석인정</th><th class="r">실출석</th><th class="r">출석률</th><th class="r">유고</th><th class="r">무단</th><th class="r" title="지각 · 조퇴 · 결과">지·조·결</th><th class="r">환산</th>'+(anyLow?'<th class="r" title="출석 교시 50% 미만인데 결석으로 안 바꾼 날">50%↓</th>':'')+'<th>방식</th><th class="r">참여수당</th><th class="r">교통비</th><th class="r">합계</th></tr></thead><tbody>';
   const ord={fail:0,warn:1,ok:2};
   rows.forEach(({s,p})=>{const o=est?p.now:p.o,rk=p.risk;
@@ -3095,7 +3095,7 @@ function mStu(){
 function mPay(){
   const P=A.pay,f=(k,lab,step)=>'<label class="meta">'+lab+' <input class="fi" type="number" id="pay-'+k+'" min="0" max="10000000" step="'+step+'" value="'+P[k]+'" style="width:110px"> 원</label>';
   let h=headA('훈련수당 금액')+'<div class="mb set"><div class="blk"><h3>훈련참여수당 '+tip('취성패가 아닌 학생만 계산\n출석률 80% 미만이면 0원')+'</h3><div class="form">'+f('full','정액 (한 달)',10000)+'</div><div class="form" style="margin-top:8px">'+f('day','일할 1일',1000)+f('cap','일할 상한',10000)+'</div></div>';
-  h+='<div class="blk"><h3>교통비</h3><div class="form">'+f('fare','통학 1일',100)+'</div></div><div class="form"><button class="btn" data-a="paydef">기본값으로</button><span class="meta">기본: 200,000 · 10,000 · 200,000 · 2,500</span></div></div>';
+  h+='<div class="blk"><h3>교통비</h3><div class="form">'+f('fare','통학 1일',100)+f('fareCap','단위기간 상한',1000)+'</div><p class="help" style="margin-top:8px">출석률 80% 미만이어도 지급</p></div><div class="form"><button class="btn" data-a="paydef">기본값으로</button><span class="meta">기본: 200,000 · 10,000 · 200,000 · 2,500 · 50,000</span></div></div>';
   return h;
 }
 /* 50% 미만 안내창 */
@@ -3419,12 +3419,12 @@ function buildWorkbook(x){
   }
   /* 8. 수당 기초자료 = 훈련수당 계산 (payStu) */
   if(x.sh.allow){
-    const P=A.pay,rows=[[{v:'훈련수당 계산',s:'title'}],[{v:'훈련수당 = 훈련참여수당 + 교통비 · 출석률(출석인정일수 ÷ 소정훈련일수) 80% 미만이면 둘 다 0원 · 참여수당: 단위기간이 그 달 전체면 정액 '+won(P.full)+', 방학·입학·수료·타 국비로 일부면 실출석일수 × '+won(P.day)+' (최대 '+won(P.cap)+') · 교통비: 통학인 날 실출석일 × '+won(P.fare)+' (유고결석 날 없음) · 취성패 참여자는 계산 안 함 · 진행 중인 달은 남은 날을 출석으로 본 예상 금액',s:'note'}]];
+    const P=A.pay,rows=[[{v:'훈련수당 계산',s:'title'}],[{v:'훈련수당 = 훈련참여수당 + 교통비 · 출석률(출석인정일수 ÷ 소정훈련일수) 80% 미만이면 훈련참여수당 0원 (교통비는 지급) · 참여수당: 단위기간이 그 달 전체면 정액 '+won(P.full)+', 방학·입학·수료·타 국비로 일부면 실출석일수 × '+won(P.day)+' (최대 '+won(P.cap)+') · 교통비: 통학인 날 실출석일 × '+won(P.fare)+' (최대 '+won(P.fareCap)+', 출석률과 상관없이 지급, 유고결석 날 없음) · 취성패 참여자는 계산 안 함 · 진행 중인 달은 남은 날을 출석으로 본 예상 금액',s:'note'}]];
     ms.forEach(m=>{const [a,b]=monthRange(m);rows.push([]);rows.push([{v:ymLab(m)+(b>=TODAY&&a<=TODAY?' (진행 중 · 예상)':a>TODAY?' (예정)':''),s:'title'}]);
       rows.push(['직종','이름','취성패','통학·기숙','단위기간','계산 방식','소정훈련일수','출석인정일수','실출석일수','출석률','80% 판정','통학 실출석일','훈련참여수당','교통비','훈련수당 합계','비고'].map(v=>({v,s:'h'})));
       let sp=0,sf=0;
       tr.forEach(t=>stuList(t,a,b).forEach(s=>{const p=payStu(s,m);if(!p)return;const o=p.o,rk=p.risk;
-        const note=[p.cnp?'취성패 참여자 · 훈련수당 계산 안 함':'',!p.ok?(rk&&!rk.done?'남은 날 다 나와도 80% 미달':'출석률 80% 미달 · 훈련수당 없음'):rk&&rk.st==='warn'?riskTxt(rk):'',p.ov?'계산 방식 직접 지정':'',o.low?'50% 미만 확인 '+o.low+'일':''].filter(Boolean).join(' · ');
+        const note=[p.cnp?'취성패 참여자 · 훈련수당 계산 안 함':'',!p.ok?(rk&&!rk.done?'남은 날 다 나와도 80% 미달 · 참여수당 없음':'출석률 80% 미달 · 훈련참여수당 없음'):rk&&rk.st==='warn'?riskTxt(rk):'',p.ov?'계산 방식 직접 지정':'',o.low?'50% 미만 확인 '+o.low+'일':''].filter(Boolean).join(' · ');
         if(!p.cnp){sp+=p.part;sf+=p.fare;}
         rows.push([{v:t.name,s:'l'},{v:s.name,s:'l'},{v:p.cnp?'Y':'N',s:'c'},{v:movesTxt(s),s:'l'},{v:unitTxt(p.u),s:'l'},{v:UT_LAB[p.type],s:'c'},{v:o.sd,s:'n'},{v:o.ia,s:'n'},{v:o.ra,s:'n'},{v:o.rate==null?'':o.rate,s:o.rate!=null&&o.rate<RATE_MIN?'low':'pct'},{v:rk?RISK_LAB[rk.st]:'',s:'c'},{v:o.cd,s:'n'},{v:p.cnp?'':p.part,s:'won'},{v:p.cnp?'':p.fare,s:'won'},{v:p.cnp?'':p.total,s:'won'},{v:note,s:'l'}]);}));
       rows.push([{v:'합계',s:'tot'}].concat(Array(11).fill({v:'',s:'tot'}),[{v:sp,s:'totwon'},{v:sf,s:'totwon'},{v:sp+sf,s:'totwon'},{v:'',s:'tot'}]));
