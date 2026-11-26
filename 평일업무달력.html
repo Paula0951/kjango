@@ -269,11 +269,9 @@ body.cdrag,body.cdrag *{cursor:grabbing!important;user-select:none;-webkit-user-
 .ti{position:relative;width:22px;height:22px;border-radius:50%;border:1px solid var(--faint);display:inline-flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0;vertical-align:middle;text-transform:none;letter-spacing:0}
 .ti svg.i{width:12px;height:12px}
 .ti:hover,.ti:focus-visible{border-color:var(--fg);color:var(--fg)}
-/* 툴팁: role=tooltip 요소 (aria-describedby로 연결). 모양은 이전 ::after와 동일 */
+/* 툴팁: role=tooltip 요소 (aria-describedby로 연결). position:fixed + JS(placeTip)로 화면 좌표에 놓아 스크롤·overflow 상자에 잘리지 않음 */
 /* 숨은 툴팁은 display:none — visibility/opacity 만 숨기면 오른쪽으로 삐져나가 가로 스크롤을 만든다. 보일 때 화면 밖이면 .fl 로 반대쪽 정렬(JS) */
-.ti .tt{display:none;position:absolute;bottom:calc(100% + 10px);left:-8px;width:max-content;max-width:min(300px,calc(100vw - 16px));white-space:pre-line;text-align:left;background:var(--surface);color:var(--fg);border:1px solid var(--strong);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.65;letter-spacing:.02em;font-weight:500;pointer-events:none;z-index:60}
-.ti.r .tt,.ti.fl .tt{left:auto;right:-8px}
-.ti.r.fl .tt{left:-8px;right:auto}
+.ti .tt{display:none;position:fixed;top:0;left:0;width:max-content;max-width:min(300px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;white-space:pre-line;text-align:left;background:var(--surface);color:var(--fg);border:1px solid var(--strong);border-radius:12px;padding:12px 14px;font-size:12.5px;line-height:1.65;letter-spacing:.02em;font-weight:500;pointer-events:none;z-index:200}
 .ti:hover .tt,.ti:focus-visible .tt{display:block}
 .ti.tt-off .tt{display:none!important}
 .tok{height:28px;min-width:28px;padding:0 9px;border-radius:999px;border:1px solid var(--frame);color:var(--muted);font-size:13px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -2299,12 +2297,19 @@ document.addEventListener('paste',e=>{
   placeLinks(ls,ui.selDay||defaultDay());
 });
 const ttOn=e=>{const ti=e.target.closest&&e.target.closest('.ti');if(ti&&!(e.relatedTarget&&ti.contains(e.relatedTarget)))ti.classList.remove('tt-off');};
-/* 툴팁이 뜰 때 화면 오른쪽(또는 왼쪽) 밖으로 나가면 반대쪽 정렬(.fl) — 두 달력 공용 */
-function placeTip(e){
-  const ti=e.target.closest&&e.target.closest('.ti'),tt=ti&&ti.querySelector('.tt');if(!tt)return;
-  ti.classList.remove('fl');let r=tt.getBoundingClientRect();if(!r.width)return;
-  if(r.right>innerWidth-8||r.left<8){ti.classList.add('fl');const r2=tt.getBoundingClientRect();if(r2.right>innerWidth-8||r2.left<8)ti.classList.remove('fl');}
+/* 툴팁 위치 — 두 달력 공용. 화면 좌표(fixed)로 아이콘 위에, 위 공간이 모자라면 아래에. 좌우는 화면 안으로 */
+function posTip(ti){
+  const tt=ti&&ti.querySelector('.tt');if(!tt||getComputedStyle(tt).display==='none')return;
+  if(matchMedia('(max-width:640px)').matches&&ti.closest('#att')){tt.style.top=tt.style.left='';return;}/* 폰: 화면 아래 고정 (CSS) */
+  const a=ti.getBoundingClientRect(),r=tt.getBoundingClientRect(),G=10,M=8;
+  let top=a.top-G-r.height;if(top<M)top=a.bottom+G+r.height<=innerHeight-M?a.bottom+G:Math.max(M,innerHeight-M-r.height);
+  let left=ti.classList.contains('r')?a.right+8-r.width:a.left-8;left=Math.min(Math.max(M,left),innerWidth-M-r.width);
+  tt.style.top=Math.round(top)+'px';tt.style.left=Math.round(left)+'px';
 }
+function placeTip(e){const ti=e.target.closest&&e.target.closest('.ti');if(ti){posTip(ti);requestAnimationFrame(()=>posTip(ti));}}
+/* 스크롤·창 크기 바뀌면 떠 있는 툴팁 다시 놓기 */
+const reTip=()=>document.querySelectorAll('.ti:hover,.ti:focus-visible').forEach(posTip);
+addEventListener('scroll',reTip,true);addEventListener('resize',reTip);
 document.addEventListener('mouseover',placeTip);document.addEventListener('focusin',placeTip);
 document.addEventListener('focusout',ttOn);document.addEventListener('mouseout',ttOn);
 document.addEventListener('mouseover',e=>{const c=e.target.closest&&e.target.closest('.cell[data-day]');ui.hoverDay=c?c.dataset.day:null;});
