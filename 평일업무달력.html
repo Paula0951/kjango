@@ -190,6 +190,10 @@ body.rdrag,body.rdrag .cell,body.rdrag .chip,body.rdrag .rb{cursor:crosshair}
 .cell.drop,.detail.drop,.modal.drop,.qa.drop{outline:1px dashed var(--fg);outline-offset:-6px;background:var(--surface)}
 .modal{position:relative}
 /* 끌어다 놓기 중인 칸/패널 한가운데 안내 */
+.cell.cdrop{outline:1px dashed var(--fg);outline-offset:-6px;background:var(--surface)}
+body.cdrag,body.cdrag *{cursor:grabbing!important;user-select:none;-webkit-user-select:none}
+.cghost{position:fixed;left:0;top:0;z-index:70;pointer-events:none;max-width:200px;padding:3px 10px;background:var(--surface);color:var(--fg);border:1px dashed var(--fg);border-radius:6px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toast .tundo{color:var(--fg);text-decoration:underline;text-underline-offset:3px;padding:4px 2px;font-size:inherit}
 .drop::after{content:"여기에 놓기";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--bg);color:var(--fg);border:1px dashed var(--fg);border-radius:999px;padding:6px 14px;font-size:12px;letter-spacing:.06em;white-space:nowrap;pointer-events:none;z-index:4}
 
 .next{margin-top:28px;padding:28px 0 32px;border-top:2px dashed var(--strong)}
@@ -2203,6 +2207,89 @@ function endSel(){ui.rs=null;ui.rdrag=null;document.body.classList.remove('rdrag
       const r=ui.rs,s=r.a<r.b?r.a:r.b,u=r.a<r.b?r.b:r.a;endSel();composeRange(s,u);return;
     }
     if(ui.rs&&(mv||e.key==='PageUp'||e.key==='PageDown'))endSel();
+  },true);
+}
+/* ---------- 칩·기간 막대 끌어 옮기기 (포인터) ----------
+   잡은 칸 → 놓은 칸의 달력 일수 차이만큼 start·due를 같이 옮김. 토→금(due)/일→월, start는 토·일 → 월. start>due면 start=due. */
+let cd=null;
+function wdSnap(k,isStart){const w=P(k).getDay();return w===6?K(addD(P(k),isStart?2:-1)):w===0?K(addD(P(k),1)):k;}
+function moveItem(id,from,to,quiet){
+  const it=S.items.find(i=>i.id===id);if(!it||from===to)return false;
+  if(to<RMIN||to>RMAX)return false;
+  const dl=Math.round((P(to)-P(from))/864e5),old={start:it.start||'',due:it.due};
+  let ns=it.start?wdSnap(K(addD(P(it.start),dl)),true):'',nd=wdSnap(K(addD(P(it.due),dl)),false);
+  if(nd<RMIN||nd>RMAX||(ns&&(ns<RMIN||ns>RMAX))){toast('범위 밖 날짜 ('+RLAB+')');return false;}
+  if(ns&&ns>nd)ns=nd;
+  if(ns===old.start&&nd===old.due)return false;
+  if(it.start||ns)it.start=ns;it.due=nd;save();renderAll();
+  const m=P(nd);
+  toastUndo(m.getMonth()+1+'월 '+m.getDate()+'일로 옮김',()=>{const x=S.items.find(i=>i.id===id);if(!x)return;if('start' in x||old.start)x.start=old.start;x.due=old.due;save();renderAll();toast('되돌렸어요');});
+  if(!quiet){const c=$('grid').querySelector('.cell[data-day="'+nd+'"]');if(c&&!document.activeElement.closest('.chipw,.rb'))c.focus({preventScroll:true});}
+  return true;
+}
+function toastUndo(msg,fn){
+  const t=$('toast');t.textContent='';t.append(msg+' · ');
+  const b=document.createElement('button');b.type='button';b.className='tundo';b.textContent='되돌리기';
+  b.onclick=()=>{clearTimeout(toastT);t.hidden=true;fn();};t.append(b);
+  t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,6000);
+}
+function cdEnd(){
+  if(!cd)return;clearTimeout(cd.lp);
+  if(cd.ghost)cd.ghost.remove();
+  document.querySelectorAll('.cdrop').forEach(x=>x.classList.remove('cdrop'));
+  document.body.classList.remove('cdrag');cd=null;
+}
+{
+  const cellAt=(x,y)=>{const el=document.elementFromPoint(x,y),c=el&&el.closest&&el.closest('#grid .cell[data-day]');return c&&c.dataset.day>=RMIN&&c.dataset.day<=RMAX?c:null;};
+  const begin=()=>{
+    if(!cd||cd.on)return;cd.on=true;
+    const g=document.createElement('div');g.className='cghost';g.setAttribute('aria-hidden','true');g.textContent=cd.title;document.body.append(g);cd.ghost=g;
+    document.body.classList.add('cdrag');
+  };
+  const over=(x,y)=>{
+    cd.ghost.style.transform='translate('+(x+12)+'px,'+(y+12)+'px)';
+    const c=cellAt(x,y),k=c&&c.dataset.day!==cd.from?c:null;
+    document.querySelectorAll('.cdrop').forEach(n=>{if(n!==k)n.classList.remove('cdrop');});
+    if(k)k.classList.add('cdrop');cd.to=k?k.dataset.day:null;
+  };
+  $('grid').addEventListener('pointerdown',e=>{
+    if(e.button!==0||ui.modal||cd)return;
+    if(e.target.closest('.cb,[data-act="toggle"],.clip,.more,.add'))return;
+    const s=e.target.closest('.chip[data-id],.rb[data-id]'),c=s&&s.closest('.cell[data-day]');if(!c)return;
+    const it=S.items.find(i=>i.id===s.dataset.id);if(!it)return;
+    cd={id:it.id,title:it.title,from:c.dataset.day,x:e.clientX,y:e.clientY,pid:e.pointerId,touch:e.pointerType==='touch',on:false,to:null};
+    if(cd.touch)cd.lp=setTimeout(()=>{if(!cd)return;begin();over(cd.x,cd.y);},400);
+  });
+  document.addEventListener('pointermove',e=>{
+    if(!cd||e.pointerId!==cd.pid)return;
+    if(!cd.touch&&e.pointerType==='mouse'&&!(e.buttons&1)){cdEnd();return;}
+    if(!cd.on){
+      if(Math.abs(e.clientX-cd.x)+Math.abs(e.clientY-cd.y)<(cd.touch?10:6))return;
+      if(cd.touch){cdEnd();return;}
+      begin();
+    }
+    cd.x=e.clientX;cd.y=e.clientY;over(e.clientX,e.clientY);
+  });
+  document.addEventListener('pointerup',e=>{
+    if(!cd||e.pointerId!==cd.pid)return;
+    const d=cd;
+    if(!d.on){cdEnd();return;}
+    const to=cellAt(e.clientX,e.clientY),k=to&&to.dataset.day;
+    cdEnd();
+    const sup=ev=>{ev.stopPropagation();ev.preventDefault();};document.addEventListener('click',sup,{capture:true,once:true});setTimeout(()=>document.removeEventListener('click',sup,true),0);
+    if(k&&k!==d.from)moveItem(d.id,d.from,k);
+  });
+  document.addEventListener('pointercancel',cdEnd);
+  addEventListener('blur',cdEnd);
+  document.addEventListener('touchmove',e=>{if(cd&&cd.on)e.preventDefault();},{passive:false});
+  document.addEventListener('contextmenu',e=>{if(cd&&cd.touch)e.preventDefault();},true);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'&&cd){e.stopImmediatePropagation();e.preventDefault();cdEnd();return;}
+    if(!e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')||ui.modal||document.body.dataset.mode==='att')return;
+    const s=e.target.closest&&e.target.closest('.chip[data-id],.rb[data-id]'),c=s&&s.closest('.cell[data-day]');if(!c)return;
+    e.preventDefault();e.stopImmediatePropagation();
+    const st=e.key==='ArrowLeft'?-1:1;let d=addD(P(c.dataset.day),st);while(d.getDay()===0||d.getDay()===6)d=addD(d,st);
+    moveItem(s.dataset.id,c.dataset.day,K(d),true);
   },true);
 }
 applyStyle();renderAll();

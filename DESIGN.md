@@ -191,6 +191,13 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
 
 ## 13. Changelog
 
+**v15 (chip drag)**
+1. **Drag a chip or range bar to another day** (work-calendar month grid, mouse/pen; touch = long-press 400ms). Click without moving still opens the detail; checkbox is unaffected.
+   - While dragging: small ghost (surface fill, dashed border, no shadow), target cell gets a dashed outline (`.cdrop`), body `cdrag` = `grabbing`. Esc, window blur or releasing outside the grid cancels with no change.
+   - Move = same calendar-day delta (grabbed cell → target cell) for `start` and `due`. A landing on Sat/Sun snaps: due Sat→Fri, Sun→Mon; start Sat/Sun→Mon; start never after due. Out-of-range targets are refused.
+   - Toast `N월 N일로 옮김 · 되돌리기` (6s, underline button, no color).
+2. **Keyboard:** Alt+←/→ on a focused chip or bar moves it one weekday; the detail panel date fields remain the full alternative.
+
 **v14 (fixed schedule · special classes)**
 1. **2027 확정 일정** (`window.KR_FIXED`, source `FIXED-2027.md`): 동계 방학 26.12.21–27.1.8, 하계 방학 27.7.19–8.20, 동계 방학 27.12.20–28.1.14, 공단 창립기념일 27.9.1.
    - Attendance calendar: no class for all 직종 (holiday takes precedence).
