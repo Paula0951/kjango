@@ -335,3 +335,12 @@ Tests: `tools/verify-{,quickadd-,ranges-,tokens-,settings-}*.js` (see each file 
 3. **Less wording** — short placeholders, `# @ !` token buttons, `ⓘ` tooltips for quick-add, importance, document links, day modal and settings help; hints empty until typing.
 
 **v7** — ORYZO restyle, slim rail, photos removed.
+
+## 13. 보기 필터 · 쉬는 날 · 미리 알림 (v18)
+
+- **보기 필터 (전체 / 업무 / 출석)**: 레일의 라디오 3개 (`cal-mode` = `all|admin|att`, 처음 쓰면 전체). 업무 = 업무 달력, 출석 = 출석 달력(기존 화면), **전체 = 업무 달력 칸 위에 출석 한 줄(`.al`)**: `수업 N교시`·출결 배지·수업 없음 이유 칩. 줄을 누르면 출석 날 모달(`#aov`), 칸의 나머지는 업무 날 모달. 전체에선 레일에 `출석` 묶음(학생부·출결 분석·엑셀·달력·날짜 설정). 보던 달은 세 보기가 공유(출석 범위 밖이면 2026.12).
+- **저장소**: `weekday-cal-v1`(업무) · `attend-cal-v1`(출석)은 그대로, 공유 키 `fixed-sched-v1`(방학·휴업일) · `hol-off-v1`(끈 법정 공휴일, 두 달력 공용). 업무 달력은 출석 데이터를 직접 읽지 않고 `window.KR_ATT.dayLine/openDay/open` 만 쓴다. 공휴일을 바꾸면 출석 캐시(`SC`)도 비운다. 하나로 합치지 않은 이유: 동기 로드, 각각의 검증(`normalize`/`normA`), 칸 하나 토글에 전체를 다시 쓰지 않으려고.
+- **쉬는 날은 회색**: 공휴일·방학·개별학습·휴업일·지정일(칸 칠하기)은 모두 같은 어두운 면(`--hol-bg` = 배경 55%)과 흐린 날짜 숫자. 이유는 **칩**(`.rchip`: 지정 색 점 + 테두리, 글자는 `--muted`)으로 보이고, 방학·휴업일의 색은 출석의 종류 색을 따른다. 주황(ember)은 지연·오류만.
+- **미리 알림**: 항목마다 `rem`(기한 N일 전, 0=당일). 그날 한 번만 카드(`#rem`)로 알리고 `확인`하거나 완료하면 끝. 칸 최소 높이는 176px(전체 보기는 +24px).
+- **세그먼트 컨트롤**: 보기 4개 이하·짧은 `<select>`는 자동으로 `.seg.sc`로 바뀐다(원래 select는 숨김, 같은 change 이벤트).
+- 남은 일: 업무·출석을 한 파일로 묶는 백업/복원(지금은 각각), 업무 지정일의 '수업 없음' 반영, 배경화면에 출석 줄 넣기.

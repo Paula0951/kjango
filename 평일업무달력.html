@@ -69,6 +69,7 @@ input[type=checkbox]{accent-color:var(--fg)}
 .mp-m:focus-visible,.mp-s:focus-visible{outline:2px dashed var(--fg);outline-offset:1px}
 /* 내비 목록: 아이콘 16px + 13px 글자, hover = 면, 켜짐 = 더 밝은 면 + 왼쪽 --now 막대 */
 .tools{display:flex;flex-direction:column;gap:2px;margin-top:22px}
+.tools[hidden]{display:none}
 .tools.bot{margin-top:auto;padding-top:16px}
 .rsec{font-size:12px;letter-spacing:.1em;color:var(--faint);padding:0 10px;margin:10px 0 4px}
 .tools>.rsec:first-child{margin-top:0}
@@ -138,6 +139,8 @@ input[type=checkbox]{accent-color:var(--fg)}
 @media (hover:hover){.add{opacity:0}.cell:hover .add,.add:focus-visible{opacity:1}}
 .note{font-size:12px;letter-spacing:.04em;color:var(--muted)}
 /* 쉬는 날 이유 칩: 칸은 회색, 이유(방학·개별학습…)는 지정 색 점·테두리로 */
+.al{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;min-height:22px;font-size:12px;color:var(--muted);cursor:pointer;border-radius:6px;padding:1px 3px;margin:0 -3px}
+.al:hover{background:var(--hover)}.al .ast{display:contents}.al .ab{font-size:12px}
 .rchip{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0;align-self:flex-start;padding:1px 9px 1px 7px;border:1px solid color-mix(in srgb,var(--rc,var(--faint)) 60%,transparent);border-radius:999px;font-size:12px;line-height:18px;color:var(--muted);white-space:nowrap}
 .rchip::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--rc,var(--faint));flex-shrink:0}
 .rchip .t{overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -415,7 +418,7 @@ body.cdrag,body.cdrag *{cursor:grabbing!important;user-select:none;-webkit-user-
 .seg.sc button.on{background:var(--surface);color:var(--fg)}
 .seg.sc button.on::before{content:none}
 .seg.sc button:focus-visible{outline:2px dashed var(--fg);outline-offset:1px}
-select.fi[data-segd]{display:none}
+select.fi[data-segd]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
 .fi{width:100%;background:transparent;border:0;border-bottom:1px solid var(--fg);border-radius:0;padding:8px 2px;font-size:15px}
 /* 입력 포커스: 2px 점선 밑줄 + 옅은 Bark 틴트 (밑줄이 1px→2px로 굵어지는 만큼 아래 여백 1px 상쇄) */
 .fi:focus,.search input:focus,.ttl:focus,.ck input[type=text]:focus{outline:0;border-bottom:2px dashed var(--fg);margin-bottom:-1px;background:var(--focus-tint)}
@@ -682,13 +685,20 @@ button.wh:hover{background:var(--hover)}
 <div class="app" id="app">
   <aside class="rail">
     <div class="brand">MY<br>CALENDAR</div>
-    <div class="modesw" role="radiogroup" aria-label="달력 종류"><button role="radio" data-mode="admin" aria-checked="true" tabindex="0">업무</button><button role="radio" data-mode="att" aria-checked="false" tabindex="-1">출석</button></div>
+    <div class="modesw" role="radiogroup" aria-label="보기"><button role="radio" data-mode="all" aria-checked="false" tabindex="-1">전체</button><button role="radio" data-mode="admin" aria-checked="true" tabindex="0">업무</button><button role="radio" data-mode="att" aria-checked="false" tabindex="-1">출석</button></div>
     <div class="mpick" id="rail-months"></div>
     <nav class="tools" aria-label="보기">
       <div class="rsec" aria-hidden="true">보기</div>
       <button class="tool" id="nav-filter" data-act="side" aria-expanded="false" aria-controls="side"><svg class="i" aria-hidden="true"><use href="#i-filter"/></svg><span class="tl">필터</span></button>
       <button class="tool" data-act="nextup"><svg class="i" aria-hidden="true"><use href="#i-clock"/></svg><span class="tl">다가오는 마감</span></button>
       <button class="tool" data-act="full"><svg class="i" aria-hidden="true"><use href="#i-expand"/></svg><span class="tl">전체보기</span></button>
+    </nav>
+    <nav class="tools attnav" aria-label="출석" hidden>
+      <div class="rsec" aria-hidden="true">출석</div>
+      <button class="tool" data-act="attopen" data-m="roster"><svg class="i" aria-hidden="true"><use href="#i-users"/></svg><span class="tl">학생부</span></button>
+      <button class="tool" data-act="attopen" data-m="stats"><svg class="i" aria-hidden="true"><use href="#i-chart"/></svg><span class="tl">출결 분석</span></button>
+      <button class="tool" data-act="attopen" data-m="export"><svg class="i" aria-hidden="true"><use href="#i-table"/></svg><span class="tl">엑셀 내보내기</span></button>
+      <button class="tool" data-act="attopen" data-m="days"><svg class="i" aria-hidden="true"><use href="#i-calchk"/></svg><span class="tl">달력·날짜 설정</span></button>
     </nav>
     <nav class="tools bot" aria-label="설정">
       <button class="tool" data-act="settings" data-tab="wp"><svg class="i" aria-hidden="true"><use href="#i-img"/></svg><span class="tl">배경화면</span></button>
@@ -730,7 +740,7 @@ button.wh:hover{background:var(--hover)}
 <div class="app" id="att" hidden>
   <aside class="rail">
     <div class="brand">MY<br>CALENDAR</div>
-    <div class="modesw" role="radiogroup" aria-label="달력 종류"><button role="radio" data-mode="admin" aria-checked="true" tabindex="0">업무</button><button role="radio" data-mode="att" aria-checked="false" tabindex="-1">출석</button></div>
+    <div class="modesw" role="radiogroup" aria-label="보기"><button role="radio" data-mode="all" aria-checked="false" tabindex="-1">전체</button><button role="radio" data-mode="admin" aria-checked="true" tabindex="0">업무</button><button role="radio" data-mode="att" aria-checked="false" tabindex="-1">출석</button></div>
     <div class="mpick" id="a-months"></div>
     <nav class="tools" aria-label="관리">
       <div class="rsec" aria-hidden="true">관리</div>
@@ -838,7 +848,7 @@ function loadHolOff(){
   return [...off];
 }
 const HOLOFF=window.KR_HOLOFF=loadHolOff();
-window.KR_HOLOFF_SET=(k,on)=>{const i=HOLOFF.indexOf(k);if(on&&i>=0)HOLOFF.splice(i,1);if(!on&&i<0)HOLOFF.push(k);try{localStorage.setItem(HOLOFF_KEY,JSON.stringify(HOLOFF));}catch(e){}};
+window.KR_HOLOFF_SET=(k,on)=>{const i=HOLOFF.indexOf(k);if(on&&i>=0)HOLOFF.splice(i,1);if(!on&&i<0)HOLOFF.push(k);try{localStorage.setItem(HOLOFF_KEY,JSON.stringify(HOLOFF));}catch(e){}if(window.KR_ATT_RESET)window.KR_ATT_RESET();};
 const FIXED=window.KR_FIXED=loadFixed();/* 살아 있는 목록: 제자리에서 바꾼다 */
 const fxSubs=[];
 function fxSet(a){FIXED.splice(0,FIXED.length,...a);try{localStorage.setItem(FX_KEY,JSON.stringify(FIXED));}catch(e){}fxSubs.forEach(f=>f());}
@@ -1174,6 +1184,7 @@ function cellHTML(d,inMonth,compact){
   info.customs.forEach(c=>{if(c.off)return;h+='<span class="lab" title="'+esc(c.name)+'" style="color:'+esc(c.color)+';font-weight:600">'+esc(c.name)+'</span>';});
   if(!compact)h+='<button class="add" data-act="add" data-day="'+k+'" aria-label="'+fmtD(k)+'에 추가"><svg class="i" style="width:14px;height:14px"><use href="#i-plus"/></svg></button>';
   h+='</div>';
+  if(!compact&&document.body.dataset.view==='all'&&window.KR_ATT){const al=KR_ATT.dayLine(k,info.notes.map(n=>n.t));if(al)h+='<div class="al" data-act="attday" data-day="'+k+'" title="수업·출결 열기">'+al+'</div>';}
   h+=rg.h;
   info.customs.forEach(c=>{if(c.off)h+=reasonChip(c.name,c.color);});
   info.notes.forEach(n=>{if(n.f)h+=reasonChip(n.t,n.c);else h+='<div class="note"'+(n.c?' style="color:'+esc(n.c)+'"':n.h?' style="color:var(--muted)"':'')+'>'+esc(n.t)+'</div>';});
@@ -1223,7 +1234,7 @@ function fitGrid(){
   const g=$('grid');if(!g)return;
   if(innerWidth<=640){g.style.height='';fitChips();return;}
   const top=g.getBoundingClientRect().top+scrollY,qa=document.querySelector('.qa'),rows=Math.round(g.children.length/5)||5;
-  g.style.height=Math.max(rows*ROWMIN,Math.floor(innerHeight-top-(qa?qa.offsetHeight:0)-8))+'px';
+  g.style.height=Math.max(rows*(ROWMIN+(document.body.dataset.view==='all'&&window.KR_ATT&&window.KR_ATT.has()?24:0)),Math.floor(innerHeight-top-(qa?qa.offsetHeight:0)-8))+'px';
   fitChips();
 }
 function fitChips(){
@@ -2120,6 +2131,8 @@ document.addEventListener('click',e=>{
    case 'today':{const i=MONTHS.findIndex(m=>TODAY.startsWith(m.y+'-'+pad(m.m+1)));if(i<0)toast('오늘은 달력 범위 밖이에요 ('+RLAB+')');else{ui.mi=i;renderMain();}break;}
    case 'side':$('app').classList.toggle('side-open');break;
    case 'item':{const fromModal=!!ui.modal;closeModal();openItem(t.dataset.id,fromModal?focusKey(document.activeElement):null);break;}
+   case 'attday':if(window.KR_ATT)KR_ATT.openDay(t.dataset.day);break;
+   case 'attopen':if(window.KR_ATT)KR_ATT.open(t.dataset.m);break;
    case 'day':ui.selDay=t.dataset.day;openModal('day');break;
    case 'add':ui.selDay=t.dataset.day;openModal('day');break;
    case 'jump':{const d=t.dataset.day;closeModal();ui.mi=+t.dataset.mi;ui.selDay=d;ui.fk=d;renderMain();const c=$('grid').querySelector('.cell[data-day="'+d+'"]');if(c){c.tabIndex=0;c.focus({preventScroll:true});c.scrollIntoView({block:'nearest'});}openModal('day');break;}
@@ -2550,6 +2563,8 @@ renderRem();setInterval(renderRem,60000);document.addEventListener('visibilitych
 applyStyle();renderAll();
 {const c=todayCell();if(c){const r=c.getBoundingClientRect();if(r.bottom>innerHeight||r.top<0)c.scrollIntoView({block:'nearest'});}}
 let fT;addEventListener('resize',()=>{clearTimeout(fT);fT=setTimeout(fitGrid,80);});
+window.reasonChip=reasonChip;window.kindColor=kindColor;
+window.KR_WORK={render:()=>renderMain(),ym:()=>MONTHS[ui.mi]||null,goYM:(y,m)=>{const i=MONTHS.findIndex(x=>x.y===y&&x.m===m);if(i>=0&&i!==ui.mi){ui.mi=i;ui.selDay=null;}}};
 window.__adm={get parseQuick(){return parseQuick;},get tagW(){return tagW;},get normalize(){return normalize;},get needsDone(){return needsDone;},get isLate(){return isLate;}};
 })();
 </script>
@@ -2821,14 +2836,21 @@ const monthOpts=cur=>AM.map((m,i)=>'<option value="'+i+'"'+(i===cur?' selected':
 const stuStatus=s=>s.complete&&s.complete<TODAY?'수료':s.admit&&s.admit>TODAY?'입학 예정':'재학';
 
 /* ---------- main render ---------- */
+let curMode=null;
 function setMode(m,focus){
-  document.body.dataset.mode=m;$('app').hidden=m==='att';$('att').hidden=m!=='att';
+  if(m!=='all'&&m!=='att')m='admin';
+  /* 보던 달을 따라가기 (출석은 2026.12부터) */
+  try{if(curMode==='att'&&m!=='att'&&window.KR_WORK){const x=AM[au.mi];if(x)KR_WORK.goYM(x.y,x.m);}
+    else if(curMode&&curMode!=='att'&&m==='att'&&window.KR_WORK){const x=KR_WORK.ym();if(x){const i=AM.findIndex(q=>q.y===x.y&&q.m===x.m);au.mi=i>=0?i:0;}}}catch(e){}
+  curMode=m;
+  document.body.dataset.mode=m==='att'?'att':'admin';document.body.dataset.view=m;$('app').hidden=m==='att';$('att').hidden=m!=='att';
+  const an=document.querySelector('#app .attnav');if(an)an.hidden=m!=='all';
   try{localStorage.setItem(MKEY,m);}catch(e){}
   /* 라디오 묶음: 켜진 것만 Tab 정지점(로빙 tabindex) */
   document.querySelectorAll('.modesw [data-mode]').forEach(b=>{const on=b.dataset.mode===m;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;});
   if(focus){const b=document.querySelector((m==='att'?'#att':'#app')+' .modesw [data-mode="'+m+'"]');if(b)b.focus();}
-  document.title=m==='att'?'출석 달력':'평일 업무 달력';
-  if(m==='att')renderA();else dispatchEvent(new Event('resize'));
+  document.title=m==='att'?'출석 달력':m==='all'?'달력':'평일 업무 달력';
+  if(m==='att')renderA();else if(window.KR_WORK)KR_WORK.render();else dispatchEvent(new Event('resize'));
 }
 function renderA(){fixTrack();renderRailA();renderHeroA();renderBarA();if(!A.tracks.length)renderEmpty();else if(au.view==='week')renderWeek();else if(au.view==='stu')renderStuView();else renderMonth();}
 let aPick=null;
@@ -2985,13 +3007,13 @@ function clearOff(){
   });
   saveA();au.sel.clear();rerender();toast((n?'특이사항 '+n+'건 지움':'지울 특이사항 없음')+(range?' · 기간·전체 직종 특이사항은 수업일 설정에서':''));
 }
-function rerender(){if(au.modal)renderAM();renderA();}
+function rerender(){if(au.modal)renderAM();renderA();if(document.body.dataset.view==='all'&&window.KR_WORK)KR_WORK.render();}
 
 /* ---------- modals ---------- */
 function headA(t){return '<div class="mh"><h2 id="amt">'+t+'</h2><button class="ib" data-a="closem" aria-label="닫기"><svg class="i"><use href="#i-x"/></svg></button></div>';}
 function tabsA(list){return '<div class="tabs" role="tablist">'+list.map(([v,l])=>'<button role="tab" id="atab-'+v+'" aria-selected="'+(au.tab===v)+'" tabindex="'+(au.tab===v?0:-1)+'" class="'+(au.tab===v?'on':'')+'" data-a="tab" data-v="'+v+'">'+l+'</button>').join('')+'</div>';}
-function openAM(kind,opt){if(!au.modal)au.opener=document.activeElement;au.modal=kind;au.arm=null;Object.assign(au,opt||{});$('att').inert=true;$('aov').hidden=false;au.sel.clear();renderAM();const f=$('amodal').querySelector('[role=tab][aria-selected=true]')||$('amodal').querySelector('[data-a=closem]');f&&f.focus();}
-function closeAM(){au.modal=null;au.arm=null;au.sel.clear();$('aov').hidden=true;$('amodal').innerHTML='';$('att').inert=false;renderA();const o=au.opener;au.opener=null;try{if(o&&document.contains(o))o.focus();}catch(e){}}
+function openAM(kind,opt){if(!au.modal)au.opener=document.activeElement;au.modal=kind;au.arm=null;Object.assign(au,opt||{});$('att').inert=true;if(document.body.dataset.view==='all')$('app').inert=true;$('aov').hidden=false;au.sel.clear();renderAM();const f=$('amodal').querySelector('[role=tab][aria-selected=true]')||$('amodal').querySelector('[data-a=closem]');f&&f.focus();}
+function closeAM(){au.modal=null;au.arm=null;au.sel.clear();$('aov').hidden=true;$('amodal').innerHTML='';$('att').inert=false;$('app').inert=false;renderA();if(document.body.dataset.view==='all'&&window.KR_WORK)KR_WORK.render();const o=au.opener;au.opener=null;try{if(o&&document.contains(o))o.focus();}catch(e){}}
 const AFK=['data-a','data-v','data-sid','data-s','data-p','data-k','data-id','data-f','data-m'];
 function aKey(el){if(!el||el===document.body)return null;if(el.id)return '#'+CSS.escape(el.id);const s=AFK.filter(x=>el.hasAttribute(x)).map(x=>'['+x+'="'+CSS.escape(el.getAttribute(x))+'"]').join('');return s?el.tagName.toLowerCase()+s:null;}
 function renderAM(){
@@ -3561,7 +3583,7 @@ function pasteImport(text){
 }
 
 /* ---------- events ---------- */
-const isAtt=()=>document.body.dataset.mode==='att';
+const isAtt=()=>document.body.dataset.mode==='att'||!!au.modal;
 function stepDay(k,dir){let d=addD(P(k),dir);while(d.getDay()===0||d.getDay()===6)d=addD(d,dir);const x=K(d);return x<AMIN||x>AMAX?null:x;}
 function goA(n){
   if(au.view==='week'){const w=K(addD(P(au.wk),7*n));if(K(addD(P(w),4))<AMIN||w>AMAX){toast('달력 범위 밖이에요 ('+ALAB+')');return;}au.wk=w;const i=AM.findIndex(m=>w.startsWith(ymOf(m)));if(i>=0)au.mi=i;au.sel.clear();renderA();return;}
@@ -3727,7 +3749,7 @@ $('amodal').addEventListener('change',e=>{
 document.addEventListener('keydown',e=>{
   const b=e.target.closest&&e.target.closest('.modesw [data-mode]');if(!b||e.altKey||e.ctrlKey||e.metaKey)return;
   const d={ArrowLeft:-1,ArrowUp:-1,ArrowRight:1,ArrowDown:1}[e.key];if(d==null)return;
-  e.preventDefault();const ms=['admin','att'];setMode(ms[(ms.indexOf(b.dataset.mode)+d+ms.length)%ms.length],true);
+  e.preventDefault();const ms=['all','admin','att'];setMode(ms[(ms.indexOf(b.dataset.mode)+d+ms.length)%ms.length],true);
 });
 document.addEventListener('keydown',e=>{
   if(!isAtt())return;
@@ -3750,9 +3772,27 @@ document.addEventListener('keydown',e=>{
   if((e.key==='PageUp'||e.key==='PageDown')&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey){e.preventDefault();goA(e.key==='PageUp'?-1:1);}
 });
 
+/* ---------- 전체 보기에서 업무 달력이 쓰는 출석 API ---------- */
+window.KR_ATT_RESET=()=>{SC.clear();};
+window.KR_ATT={
+  has:()=>A.tracks.length>0,
+  /* 그날 수업·출결 한 줄 (HTML). 업무 칸의 쉬는 날 칩과 겹치는 이름(skip)은 뺀다 */
+  dayLine(k,skip){
+    if(!A.tracks.length)return '';
+    const sc=sched(k,'');if(sc.oor||sc.wk)return '';
+    const sk=skip||[];let h='';
+    sc.labs.forEach(x=>{const nm=x.o.name||x.kd.name;if(sk.some(t=>String(t).indexOf(nm)>=0))return;const pp=x.o.periods&&x.o.periods.length?' '+x.o.periods.join('·')+'교시':'';const off=x.kd.noClass&&!(x.o.periods&&x.o.periods.length);h+=reasonChip(nm+pp,x.kd.color,off?'':'on',nm+pp+(x.kd.noClass?' · 수업 없음':''));});
+    if(sc.ps.length)h+='<span>수업 '+sc.ps.length+'교시</span>'+daySummary(k,'');
+    else if(!sc.hol&&!sc.labs.length)h+='<span>수업 없음</span>';
+    return h;
+  },
+  openDay(k){if(k<AMIN||k>AMAX||isWk(k))return;au.day=k;au.fk=k;au.dayTrack=au.track;openAM('day');},
+  open(m){openAM(m,{tab:null});}
+};
+
 /* ---------- init ---------- */
-let mode='admin';try{mode=localStorage.getItem(MKEY)==='att'?'att':'admin';}catch(e){}
-try{if(/[?#&]mode=att/.test(location.href))mode='att';}catch(e){}
+let mode='all';try{const v=localStorage.getItem(MKEY);if(v==='att'||v==='admin'||v==='all')mode=v;}catch(e){}
+try{const q=location.href.match(/[?#&](?:mode|view)=(att|all|admin|work)/);if(q)mode=q[1]==='work'?'admin':q[1];}catch(e){}
 setMode(mode);
 })();
 </script>
