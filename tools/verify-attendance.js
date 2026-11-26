@@ -32,6 +32,7 @@ const ROOT=path.resolve(__dirname,'..'),OUT=path.join(ROOT,'shots',process.argv[
   const sid=await pg.locator('#amodal [data-a=ast]').first().getAttribute('data-sid');
   await pg.click(`#amodal [data-a=ast][data-sid="${sid}"][data-s="조퇴"]`);
   for(const p of [3,4,5])await pg.click(`#amodal [data-a=ap][data-sid="${sid}"][data-p="${p}"]`);
+  console.log('50% popup',await pg.locator('#apop').isVisible());await pg.screenshot({path:OUT+'/pop50-1440x900.png'});await pg.click('#apop [data-v=keep]');
   await pg.screenshot({path:OUT+'/day-1440x900.png'});
   await pg.keyboard.press('Escape');
   await pg.click('[data-a=open][data-m=stats]');await pg.click('#amodal [data-a=smode][data-v=all]');await pg.waitForTimeout(80);
@@ -44,7 +45,7 @@ const ROOT=path.resolve(__dirname,'..'),OUT=path.join(ROOT,'shots',process.argv[
   const [dl]=await Promise.all([pg.waitForEvent('download'),pg.click('[data-a=exgo]')]);
   const f=SP+'/out.xlsx';await dl.saveAs(f);console.log('download',dl.suggestedFilename());
   // stats numbers check
-  const st=await pg.evaluate(()=>{const T=window.__attTest;return T.A.students.map(s=>{const o=T.statStu(s,'2026-12-01','2026-12-31');return s.name+':'+[o.sd,o.att,o.yu,o.mu,o.conv,o.ji,o.jo,o.gy,o.hw,o.abs,o.dd,o.cd].join(',');});});
+  const st=await pg.evaluate(()=>{const T=window.__attTest;return T.A.students.map(s=>{const o=T.statStu(s,'2026-12-01','2026-12-31');return s.name+':'+[o.sd,o.att,o.yu,o.mu,o.low,o.ji,o.jo,o.gy,o.hw,o.abs,o.dd,o.cd].join(',');});});
   console.log(st.join('\n'));
   // mobile
   await pg.setViewportSize({width:400,height:800});await pg.keyboard.press('Escape');await pg.waitForTimeout(60);

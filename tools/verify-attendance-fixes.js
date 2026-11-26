@@ -7,8 +7,8 @@ pg.on('pageerror',e=>errs.push(e.message));await pg.clock.install({time:new Date
 await pg.goto('file://'+path.join(ROOT,'평일업무달력.html')+'?mode=att');await pg.click('[data-a=sample]');
 const ok=(n,c)=>console.log((c?'PASS ':'FAIL ')+n);
 // 3. dorm/commute days add up to 출석일
-const r3=await pg.evaluate(()=>{const T=window.__attTest;return T.A.students.map(s=>{const o=T.statStu(s,'2026-12-01','2026-12-31');return [s.name,o.att,o.dd+o.cd,o.hw];});});
-ok('#3 통학+기숙 = 출석일 '+JSON.stringify(r3.find(x=>x[0]==='김하늘')),r3.every(([,a,d])=>a===d));
+const r3=await pg.evaluate(()=>{const T=window.__attTest;return T.A.students.map(s=>{const o=T.statStu(s,'2026-12-01','2026-12-31');return [s.name,o.ra,o.dd+o.cd,o.hw];});});
+ok('#3 통학+기숙 실출석 = 실출석일 '+JSON.stringify(r3.find(x=>x[0]==='김하늘')),r3.every(([,a,d])=>a===d));
 // 2. stale track filters
 await pg.click('[data-a=open][data-m=stats]');await pg.selectOption('#st-track',{index:1});await pg.keyboard.press('Escape');
 await pg.click('#a-bar [data-a=clearex]');await pg.click('[data-a=sample]');

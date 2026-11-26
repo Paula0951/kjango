@@ -209,12 +209,14 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
 **Rules**
 - 훈련소정일수 = weekday, not a holiday, not covered by a "수업 없음" 특이사항, within the student's 입학–수료 dates. 6 periods/day (45 min, lunch 12–13), editable times.
 - 특이사항 = {from, to?, kind, name, track | all, periods[] | whole day}. Kinds are user-managed; `noClass` decides whether they remove class days/periods (방학·개별학습·자체 휴업일 on, 행사·특강 off).
-- Attendance is recorded **per day** (default 출석, no row stored). 지각·조퇴·결과 store the missed periods. If attended periods < 50% of that day's periods → the day counts as 결석 ("50%미만 결석").
+- Attendance is recorded **per day** (default 출석, no row stored). 지각·조퇴·결과 store the missed periods. If attended periods < 50% of that day's periods the app does **not** convert it: an alertdialog (`#apop`) asks 무단결석으로 / 유고결석으로 / 그대로 두기 (Esc = 그대로). A kept day shows a `--c2` "⚠ 50% 미만 · 처리하기" line in the day modal, ⚠ on the calendar badge, and counts in `low` (50%↓ column).
 - 지각+조퇴+결과 (non-converted) 3 → 결석 1일, computed **per calendar month**, summed for longer ranges.
 - 단위기간 = the calendar month, from the later of 입학일 and the day after 타 국비 종료일 (`govEnd`). Days before it are still recorded but are left out of 소정일 and the rate. 방학 and other 수업 없음 days are already left out of 소정일.
-- 출석인정일수 = 소정일 − 결석 계, where 결석 계 = 무단 + 50%미만 + 환산. 유고결석 counts as attended. 실출석일수 = 소정일 − (유고 + 무단 + 50%미만). 출석률 = 출석인정일수 ÷ 소정일. Rates < 80% (`RATE_MIN`) use `--c4`.
+- 출석인정일수 = 소정일 − 결석 계, where 결석 계 = 무단 + 환산 (지각·조퇴·결과 3회 = 1일, per month). 유고결석 counts as attended. 실출석일수 = 소정일 − (유고 + 무단): 지각·조퇴·결과 days count, even when converted. 출석률 = 출석인정일수 ÷ 소정일. Rates < 80% (`RATE_MIN`) use `--c4`.
 - 80% 판정 (`unitRisk`, per month): 남은 날은 출석으로 가정 → 최대 출석률, 허용 결석 = 출석인정 − ceil(소정 × 0.8). 미달 (`--c4`) = 끝난 달 < 80% or 남은 날 다 나와도 < 80%; 위험 (`--c2`) = 결석 1–2일 더 → 미달. Shown as a hero stat (opens 출결 분석 for that month), a table at the top of 출결 분석, a badge in the day modal, and 80% 판정 + 0원 in 수당 기초자료.
-- 통학/기숙 per day: 기숙사 입소일 set → 기숙 from that date; otherwise 통학 = N means 기숙 for the whole period. 취성패 Y → 훈련참여수당 0원 (export note). 환산결석 days are taken off 통학/기숙 출석일 too (from the month's last 지각·조퇴·결과 days, by that day's status), so 통학 + 기숙 = 출석일.
+- 통학/기숙 per day: `commute` = status at 입학, `moves` = [{d, t:'C'|'D'}] changes (legacy `dorm` → a D move). `cd` = 통학 실출석일 (교통비), `dd` = 기숙 실출석일, cd + dd = 실출석.
+- **훈련수당** (`payStu`, per month) = 훈련참여수당 + 교통비, not computed for 취성패 (rate still shown). Rate < 80% → both 0. 단위기간 (`unitInfo`) = first–last class day the student attends that month; partial if 방학 (kind `vac` or name contains 방학, incl. fixed schedule), 입학, 수료 or 타 국비 cuts in → 일할 = min(cap, 실출석 × day), else 정액. Per-student-month override `A.unitType['YYYY-MM|sid']` = full/pro. Amounts `A.pay` {full 200000, day 10000, cap 200000, fare 2500} editable in 수당 금액. Ongoing months: counts to today, money = projection (남은 날 출석).
+- **학생별 view** (`au.view='stu'`): summary strip (명·미달·위험·지급·합계) + one row per student (판정, 단위기간, 소정/인정/실출석 to date, rate bar with 80% tick + 최대, 유고·무단·지·조·결·환산, 방식, money). Name opens the **student card** (`mStu`): 재적 dates, 통학·기숙 change list, per-month table with 방식 select.
 - Dates outside the attendance range (before `AMIN` 2026-12-01 or after `AMAX` 2028-01-31 — e.g. the 11/30 spill-over cell/column of December 2026, 2028-02-01…) are *outside* (v17): `sched()` returns `oor` with no class periods, so they are dimmed (`.cell.oor`, `.wh.oor`, `.pc.oor`), have no `수업 N교시` label, are not clickable/selectable (week-timetable period cells are `disabled`; drag/row/column selection skips them) and never count in stats, hours or exports.
 - Imported backups are validated (`normA`): ids `[A-Za-z0-9_-]`, dates `YYYY-MM-DD`, periods 1–6, hex colors; references to missing tracks/students are dropped; non-array fields become empty lists and duplicate ids are dropped. The work-calendar `normalize()` does the same (v17): `tags`/`assignees` string → `[string]`, anything else → `[]`; checklist/links entries are coerced; items without an id, a title or a valid `YYYY-MM-DD` due are dropped; user-keyed maps (`tagColors`, `tagAuto`, `tagWeights`, `tagDone`) are prototype-less (`Object.create(null)`) so tags named `constructor`, `valueOf`, `toString` or `__proto__` behave like any other name.
 - Analysis and export count only up to today by default ("오늘까지만"), so future default-출석 days don't inflate rates. Lecturer hours include planned periods.
@@ -223,13 +225,15 @@ Same file, same tokens; a second module (`#att`, 2nd `<script>`) with its own st
 
 **Colors** absence badges `--c4`, partial `--c2`, "출석 n" dot `--c1`; class-less cells/periods are *darker* than the glass (bg 45% over the surface); holidays keep the ember rule. Special-class subject colors (`A.subjects[].color`) are user data and are never overridden by the theme. Selected period cell = Bark fill + 1px cream outline (same as other selected controls).
 
-**xlsx** written in-page (STORE zip + SpreadsheetML, inline strings, fixed style table) — no library, works offline. Sheets: 일별 교시 출결표 (per month, lecturer row per 직종), 일별 요약, 월별 통계, 누적 통계, 월별 출석률, 외부강사 달력 (per month + 강사별 시수), 강사 월별 시수, 수당 기초자료, 학생부·강사 명단·수업일 명부. Verify with `node tools/verify-attendance.js <dir>`, `node tools/verify-attendance-fixes.js` and `node tools/verify-attendance-rate.js`.
+**xlsx** written in-page (STORE zip + SpreadsheetML, inline strings, fixed style table) — no library, works offline. Sheets: 일별 교시 출결표 (per month, lecturer row per 직종), 일별 요약, 월별 통계, 누적 통계, 월별 출석률, 외부강사 달력 (per month + 강사별 시수), 강사 월별 시수, 수당 기초자료, 학생부·강사 명단·수업일 명부. Verify with `node tools/verify-attendance.js <dir>`, `node tools/verify-attendance-fixes.js` and `node tools/verify-attendance-rate.js` (rates, 훈련수당, popup).
 
 ## 13. TODO
 
 - **라이트 테마 (light blue-grey) — 추후.** Not in v16. Starting point = the review's "paper" preset tokens, but the user wants a **light blue-grey** direction rather than warm paper: bg ≈ `#eef1f5`, surfaces cool grey (raise ≈ `#e4e8ee`, hover ≈ `#dbe0e7`, surface ≈ `#cfd6df`), fg ≈ `#1f2630`, `--now` deeper blue ≈ `#2f6690`; line/frame as fg 13%/24% mixes; category hues re-tuned for ≥4.5:1 on the light bg; ambient light becomes a faint cool sky glow; holiday ember darkened for AA. Ship as a `[data-theme=light]` / preset, keep `color-scheme` in sync.
 
 ## 14. Changelog
+
+**v19 (훈련수당 계산)** — 50% 미만 auto-결석 replaced by a confirm popup; 실출석 keeps 지각·조퇴·결과 days; 학생별 view + student card; 훈련참여수당 정액/일할 + 교통비 calculator with 80% gate; 통학·기숙 change history; xlsx sheet 훈련수당 계산.
 
 **v18 (출석률 기준)** — 유고결석 = 출석 인정; 출석인정일수·실출석일수 split; 학생별 타 국비 종료일 (단위기간 시작); 80% 미달·위험 판정 in hero, 출결 분석, day modal and xlsx.
 
