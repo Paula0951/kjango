@@ -109,7 +109,7 @@ let fails = 0; const ok = (name, c) => { if (!c) fails++; console.log((c ? 'PASS
   await p.keyboard.press('PageUp'); s = await st(B); ok('출석: 고르기 안 PageUp = 연도만 (달은 그대로)', s.yr === '2026' && s.title === 'JANUARY');
   await p.click('[data-a=today]'); s = await st(B); ok('출석: 오늘(범위 밖) → 안내만, 달 그대로', s.title === 'JANUARY' && s.cur === null && await p.locator('#toast').isVisible());
   const at = await p.evaluate(() => document.querySelectorAll('#att .lab.tdy').length); ok('출석: TODAY 글자 없음', at === 0);
-  await p.click('#att .modesw [data-mode=admin]'); s = await st(A); ok('모드 바꿔도 업무 달력 고르기 유지', s.title === 'NOVEMBER' && s.yr === '2026');
+  await p.click('#att .modesw [data-mode=admin]'); s = await st(A); ok('모드를 바꿔도 보던 달 유지 (달력 공용)', s.title === 'JANUARY' && s.yr === '2028');
 
   console.log('ERRORS', JSON.stringify(errs));
   await b.close(); process.exit(fails || errs.length ? 1 : 0);
