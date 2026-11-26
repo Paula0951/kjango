@@ -852,10 +852,13 @@ window.KR_HOLOFF_SET=(k,on)=>{const i=HOLOFF.indexOf(k);if(on&&i>=0)HOLOFF.splic
 const FIXED=window.KR_FIXED=loadFixed();/* 살아 있는 목록: 제자리에서 바꾼다 */
 const fxSubs=[];
 function fxSet(a){FIXED.splice(0,FIXED.length,...a);try{localStorage.setItem(FX_KEY,JSON.stringify(FIXED));}catch(e){}fxSubs.forEach(f=>f());}
-function fxImport(s){/* 백업에서: 새 형식(fixed) 또는 예전 disabledFixed */
+function fxParse(s){/* 백업에서: 새 형식(fixed) 또는 예전 disabledFixed → 새 목록 (없으면 null). 쓰지는 않음 */
+  s=s&&typeof s==='object'?s:{};
   const n=normFixed(s.fixed);
-  if(n)fxSet(n);else if(Array.isArray(s.disabledFixed))fxSet(FIXED.map(f=>Object.assign({},f,{on:!s.disabledFixed.includes(f.id)})));
+  if(n)return n;
+  return Array.isArray(s.disabledFixed)?FIXED.map(f=>Object.assign({},f,{on:!s.disabledFixed.includes(f.id)})):null;
 }
+function fxImport(s){const n=fxParse(s);if(n)fxSet(n);}
 const fxDays=(a,b)=>{let n=0;for(let d=P(a),e=P(b);d<=e;d=addD(d,1)){const w=d.getDay();if(w&&w<6)n++;}return n;};
 function fxHTML(tip,arm){
   const kopt=v=>'<option value="vac"'+(v==='vac'?' selected':'')+'>방학</option><option value="closed"'+(v==='closed'?' selected':'')+'>휴업일</option>',rg=' min="'+RMIN+'" max="'+RMAX+'"';
@@ -906,7 +909,7 @@ function fxEdit(el){
   }
   fxSet(FIXED.slice());return true;
 }
-window.KR_FX={subs:fxSubs,html:fxHTML,click:fxClick,edit:fxEdit,imp:fxImport,list:()=>FIXED.map(f=>Object.assign({},f))};
+window.KR_FX={subs:fxSubs,html:fxHTML,click:fxClick,edit:fxEdit,imp:fxImport,parse:fxParse,list:()=>FIXED.map(f=>Object.assign({},f))};
 
 const DEF_STYLE={bg:'',fg:'',surface:'',holBg:'',holFg:'',todayBg:'',highBg:'',highFg:'',fontSize:14,previewCap:0,hideDone:false,weekendNotes:true};
 /* 벽지 기본 배경 #100904 는 앱 배경(--bg #1a140f)과 일부러 다른 벽지 전용 값: 바탕화면 아이콘 뒤에서 한 단계 더 가라앉은 어두운 면. 설정 › 배경화면에서 사용자가 바꿈 */
@@ -1722,13 +1725,13 @@ function tabWp(){
   if(ui.wpUrl)h+='<div class="wp-prev"><img src="'+ui.wpUrl+'" alt="바탕화면 미리보기"></div><p class="help" style="margin-top:8px">PNG 우클릭 → 바탕 화면 배경으로 설정 '+tip('저장 버튼이 안 되면 이미지를 우클릭 → 다른 이름으로 이미지 저장')+'</p>';
   return h+'</div>';
 }
-const bkObj=()=>Object.assign({},S,{fixed:FIXED});
+const bkObj=()=>window.KR_BACKUP?KR_BACKUP.build():Object.assign({},S,{fixed:FIXED});
 function tabData(){
   const ex=S.items.filter(i=>i.ex).length+S.customs.filter(c=>c.ex).length;
   let h='<div class="blk"><h4>백업</h4><p class="help">이 브라우저에만 저장됨 '+tip('브라우저 기록을 지우거나 PC를 바꾸면 사라질 수 있어요 · 가끔 백업하세요\n다른 PC·다른 파일로 옮길 때도 백업 → 불러오기')+'</p>';
-  h+='<div class="form"><button class="btn pri" data-act="bkfile">백업 파일 저장 (.json)</button><button class="btn" data-act="bkcopy">백업 내용 복사</button></div>';
+  h+='<div class="form"><button class="btn pri" data-act="bkfile">모든 데이터 저장 (.json)</button><button class="btn" data-act="bkcopy">백업 내용 복사</button></div>';
   h+='<textarea class="fi code" id="bk-out" readonly style="margin-top:8px" aria-label="백업 내용">'+esc(JSON.stringify(bkObj()))+'</textarea></div>';
-  h+='<div class="blk"><h4>불러오기</h4><p class="help">지금 데이터를 덮어써요</p><div class="form"><input type="file" id="bk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="bk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기"></textarea><div class="form" style="margin-top:8px">'+(ui.arm==='imp'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-act="armimp">불러오기</button>')+'</div><div class="err" id="bk-err"></div></div>';
+  h+='<div class="blk"><h4>불러오기</h4><p class="help">고른 것만 덮어써요 '+tip('업무·출석 백업 모두 불러와요')+'</p><div class="form"><input type="file" id="bk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="bk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기"></textarea>'+(ui.arm==='imp'&&ui.bkp&&window.KR_BACKUP?KR_BACKUP.chooser(ui.bkp,'bk-c'):'')+'<div class="form" style="margin-top:8px">'+(ui.arm==='imp'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-act="armimp">불러오기</button>')+'</div><div class="err" id="bk-err"></div></div>';
   h+='<div class="blk"><h4>정리</h4><div class="form">'+(ex?'<button class="btn" data-act="clearex">예시 항목 '+ex+'개 지우기</button>':'')+(ui.arm==='reset'?'<button class="btn" data-act="disarm">취소</button><button class="btn danger arm" data-act="reset">모두 지우기 확인</button>':'<button class="btn danger" data-act="armreset">모든 데이터 지우기</button>')+'</div></div>';
   return h;
 }
@@ -2213,10 +2216,14 @@ document.addEventListener('click',e=>{
    case 'sreset':S.style[t.dataset.k]='';save();applyStyle();renderModal();break;
    case 'wpmake':{const sm=$('w-m');ui.wpMi=sm?+sm.value:ui.mi;makeWp();break;}
    case 'wpsave':{if(!ui.wpBlob)break;const m=MONTHS[ui.wpMi==null?ui.mi:ui.wpMi];download('달력_'+m.y+'-'+pad(m.m+1)+'.png',ui.wpBlob);break;}
-   case 'bkfile':download('달력백업_'+TODAY+'.json',new Blob([JSON.stringify(bkObj(),null,1)],{type:'application/json'}));break;
+   case 'bkfile':download('달력-백업-'+TODAY+'.json',new Blob([JSON.stringify(bkObj(),null,1)],{type:'application/json'}));break;
    case 'bkcopy':{const ta=$('bk-out');const txt=ta.value;if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast('복사했어요'),()=>{ta.select();toast('선택된 내용을 Ctrl+C로 복사하세요');});}else{ta.select();toast('선택된 내용을 Ctrl+C로 복사하세요');}break;}
-   case 'armimp':{if(!$('bk-in').value.trim()){$('bk-err').textContent='백업 파일이나 내용 필요';break;}ui.pendingImp=$('bk-in').value;ui.arm='imp';renderModal();$('bk-in').value=ui.pendingImp;break;}
-   case 'imp':{try{const s=JSON.parse(ui.pendingImp||$('bk-in').value);if(!s||!Array.isArray(s.items))throw 0;S=normalize(s);fxImport(s);save();applyStyle();ui.sel=null;ui.arm=null;renderAll();renderModal();toast('불러왔어요 · 항목 '+S.items.length+'개');}catch(err){ui.arm=null;renderModal();$('bk-err').textContent='백업 형식이 아니에요';}break;}
+   case 'armimp':{const tx=$('bk-in').value;if(!tx.trim()){$('bk-err').textContent='백업 파일이나 내용 필요';break;}
+     let p;try{p=KR_BACKUP.parse(tx);}catch(err){$('bk-err').textContent=err&&err.bk?err.message:'백업 형식이 아니에요';break;}
+     ui.bkp=p;ui.pendingImp=tx;ui.arm='imp';renderModal();$('bk-in').value=tx;break;}
+   case 'imp':{const p=ui.bkp;ui.arm=null;ui.bkp=null;ui.pendingImp=null;
+     try{if(!p)throw Object.assign(new Error('백업 형식이 아니에요'),{bk:1});const m=KR_BACKUP.apply(p,KR_BACKUP.sel('bk-c'));ui.sel=null;renderAll();renderModal();toast(m);}
+     catch(err){renderModal();$('bk-err').textContent=err&&err.bk?err.message:'불러오지 못했어요 · 그대로 둠';}break;}
    case 'armreset':ui.arm='reset';renderModal();break;
    case 'reset':S={items:[],customs:[],disabledHol:[],style:Object.assign({},DEF_STYLE),wp:Object.assign({},DEF_WP),tagColors:NM(),tagAuto:NM(),tagWeights:NM(),tagDone:NM(),kw:{},syn:normSyn()};applySyn();ui.sel=null;ui.arm=null;save();applyStyle();renderAll();renderModal();toast('모두 지웠어요');break;
   }
@@ -2321,7 +2328,7 @@ $('modal').addEventListener('change',e=>{
   else if(t.dataset.sk){renderModal();}
   else if(t.dataset.wm!=null){ui.wpMi=+t.value;ui.wpUrl=null;renderModal();return;}
   else if(t.dataset.wpre!=null){if(t.value){const [a,b]=t.value.split('x').map(Number);S.wp.w=a;S.wp.h=b;renderModal();}}
-  else if(t.id==='bk-file'&&t.files&&t.files[0]){const r=new FileReader();r.onload=()=>{$('bk-in').value=r.result;$('bk-err').textContent='';};r.readAsText(t.files[0]);return;}
+  else if(t.id==='bk-file'&&t.files&&t.files[0]){const fl=t.files[0];if(fl.size>KR_BACKUP.MAX){$('bk-err').textContent='파일이 너무 커요';t.value='';return;}const r=new FileReader();r.onload=()=>{ui.arm=null;ui.bkp=null;renderModal();$('bk-in').value=r.result;$('bk-err').textContent='';};r.readAsText(fl);return;}
   else return;
   save();renderMain();renderSide();
 });
@@ -2564,7 +2571,12 @@ applyStyle();renderAll();
 {const c=todayCell();if(c){const r=c.getBoundingClientRect();if(r.bottom>innerHeight||r.top<0)c.scrollIntoView({block:'nearest'});}}
 let fT;addEventListener('resize',()=>{clearTimeout(fT);fT=setTimeout(fitGrid,80);});
 window.reasonChip=reasonChip;window.kindColor=kindColor;
-window.KR_WORK={render:()=>renderMain(),ym:()=>MONTHS[ui.mi]||null,goYM:(y,m)=>{const i=MONTHS.findIndex(x=>x.y===y&&x.m===m);if(i>=0&&i!==ui.mi){ui.mi=i;ui.selDay=null;}}};
+window.KR_WORK={get:()=>S,norm:normalize,normFixed:normFixed,fxParse:fxParse,save:save,
+  /* 백업 불러오기: 검증이 끝난 새 업무 데이터로 바꾸기 (저장은 KR_BACKUP.apply 가 먼저 함) */
+  set:n=>{S=n;applySyn();ui.sel=null;ui.arm=null;applyStyle();renderAll();if(ui.modal)renderModal();},
+  /* 공통 목록(방학·휴업일, 끈 공휴일)을 제자리에서 바꿈. 저장 없음 */
+  setShared:(fx,off)=>{if(off){HOLOFF.splice(0,HOLOFF.length,...off);if(window.KR_ATT_RESET)window.KR_ATT_RESET();}if(fx){FIXED.splice(0,FIXED.length,...fx);fxSubs.forEach(f=>f());}if(off)renderMain();},
+  render:()=>renderMain(),ym:()=>MONTHS[ui.mi]||null,goYM:(y,m)=>{const i=MONTHS.findIndex(x=>x.y===y&&x.m===m);if(i>=0&&i!==ui.mi){ui.mi=i;ui.selDay=null;}}};
 window.__adm={get parseQuick(){return parseQuick;},get tagW(){return tagW;},get normalize(){return normalize;},get needsDone(){return needsDone;},get isLate(){return isLate;}};
 })();
 </script>
@@ -3272,8 +3284,8 @@ function mExport(){
 }
 /* ---- 백업 ---- */
 function mData(){
-  let h=headA('출석 데이터 · 백업')+'<div class="mb set"><div class="blk"><h3>백업</h3><p class="help">이 브라우저에만 저장됨 '+tip('업무 달력과 따로 저장돼요\n브라우저 기록을 지우면 사라질 수 있으니 가끔 백업하세요')+'</p><div class="form"><button class="btn pri" data-a="bk">백업 파일 저장 (.json)</button></div></div>';
-  h+='<div class="blk"><h3>불러오기</h3><p class="help">지금 출석 데이터를 덮어써요</p><div class="form"><input type="file" id="abk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="abk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기">'+esc(au.pendingImp||'')+'</textarea><div class="form" style="margin-top:8px">'+(au.arm==='imp'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-a="arm" data-v="imp">불러오기</button>')+'</div><div class="err" id="abk-err"></div></div>';
+  let h=headA('모든 데이터 · 백업')+'<div class="mb set"><div class="blk"><h3>백업</h3><p class="help">이 브라우저에만 저장됨 '+tip('업무·출석·공통 설정(공휴일·방학)이 한 파일\n브라우저 기록을 지우면 사라질 수 있으니 가끔 백업하세요')+'</p><div class="form"><button class="btn pri" data-a="bk">모든 데이터 저장 (.json)</button></div></div>';
+  h+='<div class="blk"><h3>불러오기</h3><p class="help">고른 것만 덮어써요 '+tip('업무·출석 백업 모두 불러와요')+'</p><div class="form"><input type="file" id="abk-file" accept=".json,application/json" aria-label="백업 파일"></div><textarea class="fi code" id="abk-in" placeholder="백업 내용 붙여넣기" style="margin-top:8px;min-height:80px" aria-label="백업 붙여넣기">'+esc(au.pendingImp||'')+'</textarea>'+(au.arm==='imp'&&au.bkp?KR_BACKUP.chooser(au.bkp,'abk-c'):'')+'<div class="form" style="margin-top:8px">'+(au.arm==='imp'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="imp">덮어쓰고 불러오기</button>':'<button class="btn" data-a="arm" data-v="imp">불러오기</button>')+'</div><div class="err" id="abk-err"></div></div>';
   h+='<div class="blk"><h3>정리</h3><div class="form">'+(A.ex?'<button class="btn" data-a="clearex">예시 데이터 지우기</button>':'<button class="btn" data-a="sample">예시 데이터 넣기</button>')+(au.arm==='reset'?'<button class="btn" data-a="disarm">취소</button><button class="btn danger arm" data-a="reset">모두 지우기 확인</button>':'<button class="btn danger" data-a="arm" data-v="reset">출석 데이터 모두 지우기</button>')+'</div></div>';
   return h+'</div>';
 }
@@ -3657,7 +3669,7 @@ document.addEventListener('click',e=>{
     case 'paydef':A.pay=Object.assign({},DEF_PAY);saveA();renderAM();renderA();toast('기본 금액으로 돌렸어요');break;
     case 'allok':stuSorted(au.dayTrack).forEach(s=>{const key=au.day+'|'+s.id,r=A.att[key];if(r){if(r.m)A.att[key]={s:'출석',m:r.m};else delete A.att[key];}});saveA();renderAM();renderA();toast('모두 출석으로 바꿨어요');break;
     /* 학생부 */
-    case 'arm':if(v==='imp'){const ta=$('abk-in'),txt=ta?ta.value.trim():'';if(!txt){$('abk-err').textContent='백업 파일이나 내용 필요';break;}au.pendingImp=txt;}au.arm=v;renderAM();break;
+    case 'arm':if(v==='imp'){const ta=$('abk-in'),txt=ta?ta.value.trim():'';if(!txt){$('abk-err').textContent='백업 파일이나 내용 필요';break;}let p;try{p=KR_BACKUP.parse(txt);}catch(err){$('abk-err').textContent=err&&err.bk?err.message:'백업 형식이 아니에요';break;}au.pendingImp=txt;au.bkp=p;}au.arm=v;renderAM();break;
     case 'disarm':au.arm=null;renderAM();break;
     case 'stuf':au.stuF=v;renderAM();break;
     case 'tadd':{const n=$('t-name').value.trim();if(!n)break;if(A.tracks.some(x=>x.name===n)){toast('이미 있는 직종');break;}A.tracks.push({id:uid(),name:n});saveA();renderAM();renderA();const f=$('t-name');f&&f.focus();break;}
@@ -3686,8 +3698,10 @@ document.addEventListener('click',e=>{
     case 'exall':au.exp.from=0;au.exp.to=AM.length-1;renderAM();break;
     case 'exgo':doExport();break;
     /* 백업 */
-    case 'bk':download('출석백업_'+TODAY+'.json',new Blob([JSON.stringify(Object.assign({},A,{fixed:FXA.list()}),null,1)],{type:'application/json'}));break;
-    case 'imp':{try{const s=JSON.parse($('abk-in').value||au.pendingImp||'');if(!s||!Array.isArray(s.students))throw 0;A=normA(s);FXA.imp(s);saveA();au.arm=null;au.pendingImp=null;au.track='';renderAM();renderA();toast('불러왔어요 · 학생 '+A.students.length+'명');}catch(err){au.arm=null;renderAM();$('abk-err').textContent='출석 백업 형식이 아니에요';}break;}
+    case 'bk':download('달력-백업-'+TODAY+'.json',new Blob([JSON.stringify(KR_BACKUP.build(),null,1)],{type:'application/json'}));break;
+    case 'imp':{const p=au.bkp;au.arm=null;au.bkp=null;au.pendingImp=null;
+      try{if(!p)throw Object.assign(new Error('백업 형식이 아니에요'),{bk:1});const m=KR_BACKUP.apply(p,KR_BACKUP.sel('abk-c'));renderAM();toast(m);}
+      catch(err){renderAM();$('abk-err').textContent=err&&err.bk?err.message:'불러오지 못했어요 · 그대로 둠';}break;}
     case 'reset':A=freshA();au.arm=null;au.track='';saveA();renderAM();renderA();toast('출석 데이터를 지웠어요');break;
   }
 });
@@ -3743,7 +3757,7 @@ $('amodal').addEventListener('change',e=>{
   if(t.id&&t.id.startsWith('pay-')){const k=t.id.slice(4),n=Math.round(+t.value);if(k in DEF_PAY&&Number.isFinite(n)&&n>=0&&n<=10000000){A.pay[k]=n;saveA();renderA();}else renderAM();return;}
   if(t.id==='st-upto'){au.stat.upto=t.checked?1:0;renderAM();return;}
   if(t.id==='ex-upto'){au.exp.upto=t.checked?1:0;return;}
-  if(t.id==='abk-file'&&t.files&&t.files[0]){const r=new FileReader();r.onload=()=>{$('abk-in').value=r.result;au.pendingImp=r.result;$('abk-err').textContent='';};r.readAsText(t.files[0]);return;}
+  if(t.id==='abk-file'&&t.files&&t.files[0]){const fl=t.files[0];if(fl.size>KR_BACKUP.MAX){$('abk-err').textContent='파일이 너무 커요';t.value='';return;}const r=new FileReader();r.onload=()=>{au.arm=null;au.bkp=null;au.pendingImp=r.result;renderAM();$('abk-err').textContent='';};r.readAsText(fl);return;}
 });
 /* 달력 종류 라디오: 화살표로 옮기면 바로 바뀜 */
 document.addEventListener('keydown',e=>{
@@ -3789,6 +3803,76 @@ window.KR_ATT={
   openDay(k){if(k<AMIN||k>AMAX||isWk(k))return;au.day=k;au.fk=k;au.dayTrack=au.track;openAM('day');},
   open(m){openAM(m,{tab:null});}
 };
+
+/* ---------- 모든 데이터 백업 (업무 + 출석 + 공통 설정) ----------
+   v2 = {format:'mycal',v:2,saved,work,att,shared:{fixed,holOff}}. 예전 업무(items)·출석(students) 백업도 읽는다.
+   parse: 전부 검증만(쓰지 않음) · apply: 고른 것만 한꺼번에 저장 — 하나라도 실패하면 예전 값으로 되돌림 */
+window.KR_BACKUP=(function(){
+  const MAX=8*1024*1024,DRE=/^\d{4}-\d{2}-\d{2}$/,W=window.KR_WORK;
+  const bad=m=>Object.assign(new Error(m),{bk:1});
+  const isObj=v=>v&&typeof v==='object'&&!Array.isArray(v);
+  const offList=v=>Array.isArray(v)?[...new Set(v.filter(x=>typeof x==='string'&&DRE.test(x)))].slice(0,1000):null;
+  function build(){return {format:'mycal',v:2,saved:new Date().toISOString(),work:W.get(),att:A,shared:{fixed:FIX.map(f=>Object.assign({},f)),holOff:window.KR_HOLOFF.slice()}};}
+  function parse(text){
+    if(typeof text!=='string'||text.length>MAX)throw bad('파일이 너무 커요');
+    let o;try{o=JSON.parse(text);}catch(e){throw bad('백업 형식이 아니에요');}
+    if(!isObj(o))throw bad('백업 형식이 아니에요');
+    let kind,w=null,a=null,sh=null;
+    if(o.format==='mycal'){
+      kind='v2';
+      if(o.v!==2)throw bad('지원하지 않는 버전');
+      if(o.work!=null){if(!isObj(o.work)||!Array.isArray(o.work.items))throw bad('업무 데이터 형식 오류');w=o.work;}
+      if(o.att!=null){if(!isObj(o.att)||!Array.isArray(o.att.students))throw bad('출석 데이터 형식 오류');a=o.att;}
+      if(o.shared!=null){if(!isObj(o.shared))throw bad('공통 설정 형식 오류');sh=o.shared;}
+    }else if(Array.isArray(o.items)){kind='work';w=o;sh=o;}
+    else if(Array.isArray(o.students)){kind='att';a=o;sh=o;}
+    else throw bad('백업 형식이 아니에요');
+    const p={kind,work:null,att:null,fixed:null,holOff:null};
+    if(w)p.work=W.norm(w);
+    if(a)p.att=normA(a);
+    if(sh){
+      if(kind==='v2'){
+        if('fixed' in sh){p.fixed=W.normFixed(sh.fixed);if(!p.fixed)throw bad('공통 설정 형식 오류');}
+        if('holOff' in sh){p.holOff=offList(sh.holOff);if(!p.holOff)throw bad('공통 설정 형식 오류');}
+      }else{p.fixed=W.fxParse(sh);p.holOff=offList(sh.disabledHol);}
+    }
+    if(!p.work&&!p.att&&!p.fixed&&!p.holOff)throw bad('불러올 내용이 없어요');
+    return p;
+  }
+  /* 고르기: 파일에 든 것만 켜져 있음 */
+  function chooser(p,pre){
+    const row=(k,lab,has,meta)=>'<label class="lrow"><input type="checkbox" id="'+pre+'-'+k+'"'+(has?' checked':' disabled')+' aria-label="'+esc(lab)+'"><span class="nm">'+esc(lab)+'</span><span class="meta">'+esc(has?meta:'없음')+'</span></label>';
+    const sh=!!(p.fixed||p.holOff);
+    return '<div class="chooser" style="margin-top:8px">'+row('work','업무',!!p.work,p.work?'항목 '+p.work.items.length+'개':'')+row('att','출석',!!p.att,p.att?'학생 '+p.att.students.length+'명':'')+row('shared','공통 설정',sh,sh?'공휴일·방학':'')+'</div>';
+  }
+  function sel(pre){const g=k=>{const e=document.getElementById(pre+'-'+k);return !!(e&&e.checked&&!e.disabled);};return {work:g('work'),att:g('att'),shared:g('shared')};}
+  function apply(p,s){
+    const useW=!!(s.work&&p.work),useA=!!(s.att&&p.att),useF=!!(s.shared&&p.fixed),useH=!!(s.shared&&p.holOff);
+    if(!useW&&!useA&&!useF&&!useH)throw bad('고를 항목 없음');
+    const off=useH?p.holOff:window.KR_HOLOFF.slice();
+    let nw=null,na=null;
+    if(useW){nw=p.work;nw.disabledHol=off.slice();}
+    if(useA){na=p.att;na.disabledHol=off.filter(k=>DRE.test(k));}
+    const writes=[];
+    if(nw)writes.push(['weekday-cal-v1',JSON.stringify(nw)]);
+    if(na)writes.push([AKEY,JSON.stringify(na)]);
+    if(useF)writes.push(['fixed-sched-v1',JSON.stringify(p.fixed)]);
+    if(useH)writes.push(['hol-off-v1',JSON.stringify(off)]);
+    const old=writes.map(([k])=>{try{return [k,localStorage.getItem(k)];}catch(e){return [k,null];}});
+    try{writes.forEach(([k,v])=>localStorage.setItem(k,v));}
+    catch(e){old.forEach(([k,v])=>{try{if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(_){}});throw bad('저장 못 해서 그대로 뒀어요');}
+    /* 메모리 반영 */
+    if(useF||useH)W.setShared(useF?p.fixed:null,useH?off:null);
+    if(nw){W.set(nw);W.save();}
+    if(na){A=na;au.track='';SC.clear();}
+    SC.clear();au.arm=null;au.bkp=null;au.pendingImp=null;
+    if(au.modal)renderAM();
+    rerender();
+    const n=[];if(nw)n.push('업무');if(na)n.push('출석');if(useF||useH)n.push('공통 설정');
+    return '불러왔어요 · '+n.join('·');
+  }
+  return {MAX,build,parse,chooser,sel,apply};
+})();
 
 /* ---------- init ---------- */
 let mode='all';try{const v=localStorage.getItem(MKEY);if(v==='att'||v==='admin'||v==='all')mode=v;}catch(e){}
