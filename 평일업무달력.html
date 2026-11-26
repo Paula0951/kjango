@@ -137,6 +137,11 @@ input[type=checkbox]{accent-color:var(--fg)}
 .add:hover{border-color:var(--fg);color:var(--fg)}
 @media (hover:hover){.add{opacity:0}.cell:hover .add,.add:focus-visible{opacity:1}}
 .note{font-size:12px;letter-spacing:.04em;color:var(--muted)}
+/* 쉬는 날 이유 칩: 칸은 회색, 이유(방학·개별학습…)는 지정 색 점·테두리로 */
+.rchip{display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0;align-self:flex-start;padding:1px 9px 1px 7px;border:1px solid color-mix(in srgb,var(--rc,var(--faint)) 60%,transparent);border-radius:999px;font-size:12px;line-height:18px;color:var(--muted);white-space:nowrap}
+.rchip::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--rc,var(--faint));flex-shrink:0}
+.rchip .t{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.rchip.on{color:var(--rc)}
 .chipw{display:flex;align-items:center;gap:8px;min-width:0;position:relative}
 .chip{display:flex;align-items:center;gap:8px;text-align:left;flex:1;min-width:0;padding:2px 0;font-size:var(--fs);color:var(--fg)}
 .chip .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -1075,6 +1080,10 @@ function weeksOf(y,m){
   d=w===6?addD(d,2):w===0?addD(d,1):addD(d,-(w-1));
   const out=[];while(d<=last){out.push([0,1,2,3,4].map(i=>addD(d,i)));d=addD(d,7);}return out;
 }
+/* 쉬는 날 이유 칩 (두 달력 공용). 색 = 방학·휴업일 종류의 지정 색 */
+const FXKC={vac:'#c3a0e8',closed:'#e08fb6'};
+function kindColor(id){try{const k=A.kinds.find(x=>x.id===id);if(k)return k.color;}catch(e){}return FXKC[id]||'#cdb79a';}
+function reasonChip(name,color,extra,title){return '<span class="rchip'+(extra?' '+extra:'')+'" style="--rc:'+esc(color)+'" title="'+esc(title||name)+'"><span class="t">'+esc(name)+'</span></span>';}
 const holOn=k=>HOLIDAYS[k]&&!HOLOFF.includes(k)?HOLIDAYS[k]:null;
 function dayInfo(k){
   const d=P(k),w=d.getDay(),notes=[];
@@ -1083,8 +1092,9 @@ function dayInfo(k){
     if(w===5)chk(addD(d,1),'토');
     if(w===1)chk(addD(d,-1),'일');
   }
-  if(w>=1&&w<=5)FIXED.forEach(f=>{if(f.from<=k&&k<=f.to&&f.on)notes.push({t:f.name,f:1});});
-  return {hol:holOn(k),customs:S.customs.filter(c=>c.date===k),notes};
+  let off=false;
+  if(w>=1&&w<=5)FIXED.forEach(f=>{if(f.from<=k&&k<=f.to&&f.on){notes.push({t:f.name,f:1,c:kindColor(f.kind)});off=true;}});
+  return {hol:holOn(k),customs:S.customs.filter(c=>c.date===k),notes,off};
 }
 const PR={high:0,normal:1,low:2};
 const cmp=(a,b)=>((a.status==='done')-(b.status==='done'))||(PR[a.priority]-PR[b.priority])||a.title.localeCompare(b.title,'ko');
@@ -1156,16 +1166,17 @@ const fmtD=k=>{const d=P(k);return (d.getMonth()+1)+'월 '+d.getDate()+'일 ('+D
 function cellHTML(d,inMonth,compact){
   const k=K(d),info=dayInfo(k),list=itemsOn(k),rg=rangeHTML(d,weekLanes(K(addD(d,-((d.getDay()+6)%7)))));
   const off=info.customs.find(c=>c.off);
-  const cls=['cell'];if(k<TODAY&&inMonth)cls.push('past');if(!inMonth)cls.push('out');if(info.hol)cls.push('hol');else if(k===TODAY)cls.push('today');if(k===TODAY)cls.push('tnow');
-  const st=off&&!info.hol?' style="background:'+esc(off.color)+'26"':'';
+  const cls=['cell'];if(k<TODAY&&inMonth)cls.push('past');if(!inMonth)cls.push('out');if(info.hol||info.off||off)cls.push('hol');else if(k===TODAY)cls.push('today');if(k===TODAY)cls.push('tnow');
+  const st='';
   let h='<div class="'+cls.join(' ')+'" data-act="day" data-day="'+k+'" role="button" tabindex="'+(compact?-1:(k===(ui.fk||(inMonth&&k===TODAY?k:''))?0:-1))+'" aria-label="'+fmtD(k)+(k===TODAY?' 오늘':'')+(info.hol?' '+esc(info.hol):'')+' 항목 '+(list.length+rg.n)+'개"'+(k===TODAY?' aria-current="date"':'')+st+'>';
   h+='<div class="ch"><span class="dnum">'+(d.getDate()===1||(!inMonth&&compact)?(d.getMonth()+1)+'/':'')+d.getDate()+'</span>';
   if(info.hol)h+='<span class="lab h" title="'+esc(info.hol)+'">'+esc(info.hol)+'</span>';
-  info.customs.forEach(c=>{h+='<span class="lab" title="'+esc(c.name)+'" style="color:'+esc(c.color)+';font-weight:600">'+esc(c.name)+'</span>';});
+  info.customs.forEach(c=>{if(c.off)return;h+='<span class="lab" title="'+esc(c.name)+'" style="color:'+esc(c.color)+';font-weight:600">'+esc(c.name)+'</span>';});
   if(!compact)h+='<button class="add" data-act="add" data-day="'+k+'" aria-label="'+fmtD(k)+'에 추가"><svg class="i" style="width:14px;height:14px"><use href="#i-plus"/></svg></button>';
   h+='</div>';
   h+=rg.h;
-  info.notes.forEach(n=>{h+='<div class="note"'+(n.c?' style="color:'+esc(n.c)+'"':n.h?' style="color:var(--muted)"':'')+'>'+esc(n.t)+'</div>';});
+  info.customs.forEach(c=>{if(c.off)h+=reasonChip(c.name,c.color);});
+  info.notes.forEach(n=>{if(n.f)h+=reasonChip(n.t,n.c);else h+='<div class="note"'+(n.c?' style="color:'+esc(n.c)+'"':n.h?' style="color:var(--muted)"':'')+'>'+esc(n.t)+'</div>';});
   const p=preview(list,compact?2:1e9);
   p.shown.forEach(i=>{
     const late=isLate(i);
@@ -1348,7 +1359,7 @@ function renderDetail(){
   h+='<div class="row2"><div><div class="fl">시작일</div><input class="fi" type="date" id="d-start" data-f="start" min="'+RMIN+'" max="'+RMAX+'" value="'+esc(it.start)+'"></div>';
   h+='<div><div class="fl">기한 <span class="dday" id="d-dday" style="color:'+(isLate(it)?'var(--over)':'var(--fg)')+'">'+ddayTxt(it.due)+'</span></div><input class="fi" type="date" id="d-due" data-f="due" min="'+RMIN+'" max="'+RMAX+'" value="'+esc(it.due)+'"></div></div>';
   h+='<div class="warnline" id="d-warn">'+detWarn(it)+'</div>';
-  h+='<div><div class="fl">미리 알림 '+tip('기한 며칠 전부터 달력을 열 때 알려줘요\n완료하면 알리지 않아요')+'</div><div class="seg sc" role="radiogroup" aria-label="미리 알림">'+[['','없음'],['0','당일'],['1','1일 전'],['3','3일 전'],['7','7일 전']].map(([v,l])=>{const on=(it.rem==null?'':String(it.rem))===v;return '<button type="button" role="radio" aria-checked="'+on+'" data-act="setrem" data-v="'+v+'" class="'+(on?'on':'')+'">'+l+'</button>';}).join('')+'</div>'+(it.rem!=null?' <span class="remn"><input class="fi" type="number" min="0" max="365" id="d-rem" data-f="rem" value="'+it.rem+'" aria-label="며칠 전"> 일 전 직접</span>':'')+'</div>';
+  h+='<div><div class="fl">미리 알림 '+tip('정한 날(기한 며칠 전)에 한 번만 알려줘요\n완료하면 알리지 않아요')+'</div><div class="seg sc" role="radiogroup" aria-label="미리 알림">'+[['','없음'],['0','당일'],['1','1일 전'],['3','3일 전'],['7','7일 전']].map(([v,l])=>{const on=(it.rem==null?'':String(it.rem))===v;return '<button type="button" role="radio" aria-checked="'+on+'" data-act="setrem" data-v="'+v+'" class="'+(on?'on':'')+'">'+l+'</button>';}).join('')+'</div>'+(it.rem!=null?' <span class="remn"><input class="fi" type="number" min="0" max="365" id="d-rem" data-f="rem" value="'+it.rem+'" aria-label="며칠 전"> 일 전 직접</span>':'')+'</div>';
   h+='<div><div class="fl">담당자</div>'+edHTML('d','who')+'</div>';
   h+='<div><div class="fl">분류 '+tip('띄어쓰기는 _ 로 이어져요 (본부_제출)\nEnter·쉼표로 확정, Backspace로 마지막 칩 삭제\n무게(강조·보통·참고)는 필터 패널에서 바꿔요')+'</div>'+edHTML('d','tags')+'</div>';
   h+='<div><div class="fl">문서 링크 <span>'+(it.links.length?it.links.length+'개':'')+'</span>'+tip('경로를 붙여넣거나 파일을 이 패널에 끌어다 놓으세요\n(탐색기에서 Ctrl+Shift+C로 경로 복사)'+(LOCAL?'':'\n\n이 미리보기에선 열기 대신 경로 복사로 동작해요. 내부망 HTML에선 열려요.'),1)+'</div>';
@@ -2508,10 +2519,10 @@ function cdEnd(){
   },true);
 }
 /* 필터 패널을 여닫는 모든 경로(토글·Esc·항목 열기·전체보기·설정)에서 #nav-filter 의 aria-expanded 를 맞춘다 */
-/* 미리 알림: 항목마다 기한 N일 전(0=당일)부터 기한까지, 완료 전이면 열 때·1분마다 알림 카드를 띄움 */
+/* 미리 알림: 항목마다 기한 N일 전(0=당일) 그날 한 번만, 완료 전이면 확인할 때까지 알림 카드를 띄움 */
 function renderRem(){
   const el=$('rem');if(!el)return;
-  const due=S.items.filter(i=>i.rem!=null&&i.status!=='done'&&i.remSeen!==TODAY&&i.due>=TODAY&&K(addD(P(i.due),-i.rem))<=TODAY).sort((a,b)=>a.due.localeCompare(b.due));
+  const due=S.items.filter(i=>i.rem!=null&&i.status!=='done'&&!i.remSeen&&K(addD(P(i.due),-i.rem))===TODAY).sort((a,b)=>a.due.localeCompare(b.due));
   if(!due.length){el.hidden=true;el.innerHTML='';return;}
   el.hidden=false;
   el.innerHTML='<div class="rh">미리 알림 '+due.length+'</div>'+due.slice(0,5).map(i=>'<div class="rr"><button class="ro" data-act="remopen" data-id="'+i.id+'">'+esc(i.title)+'<small>'+fmtD(i.due)+' · '+ddayTxt(i.due)+'</small></button><button class="rx" data-act="remok" data-id="'+i.id+'">확인</button></div>').join('')+(due.length>5?'<div class="rr"><span class="meta">외 '+(due.length-5)+'건</span></div>':'');
@@ -2871,7 +2882,7 @@ function acell(d,inMonth){
   h+='<div class="ch"><span class="dnum">'+(d.getDate()===1?(d.getMonth()+1)+'/':'')+d.getDate()+'</span>';
   if(sc.hol)h+='<span class="lab h">'+esc(sc.hol)+'</span>';
   h+='</div>';
-  sc.labs.forEach(x=>{const pp=x.o.periods&&x.o.periods.length?' '+x.o.periods.join('·')+'교시':'';const off=x.kd.noClass&&!(x.o.periods&&x.o.periods.length);h+='<div class="ln" style="color:'+(off?'var(--muted)':esc(x.kd.color))+';font-weight:'+(off?400:600)+'" title="'+esc((x.o.name||x.kd.name)+pp+(x.kd.noClass?' · 수업 없음':''))+'">'+esc(x.o.name||x.kd.name)+'<span style="font-weight:400">'+esc(pp)+'</span></div>';});
+  sc.labs.forEach(x=>{const pp=x.o.periods&&x.o.periods.length?' '+x.o.periods.join('·')+'교시':'';const off=x.kd.noClass&&!(x.o.periods&&x.o.periods.length);h+=reasonChip((x.o.name||x.kd.name)+pp,x.kd.color,off?'':'on',(x.o.name||x.kd.name)+pp+(x.kd.noClass?' · 수업 없음':''));});
   if(!inMonth)return h+'</div>';
   if(sc.ps.length){
     if(sc.ps.length<NP)h+='<div class="ln">수업 '+sc.ps.length+'교시</div>';
